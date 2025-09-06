@@ -1,5 +1,6 @@
 from bus import *
 from instructions_dict import *
+import time
 
 
 class Flags:
@@ -70,6 +71,7 @@ class CPU:
 
     def execute(self):
         while(True):
+            time.sleep(0.1)
             instruction = self.get_instruction()
 
             print(instruction.definition.name)
@@ -87,6 +89,7 @@ class CPU:
             self.ir_interrupt(instruction)
             self.ir_dec(instruction)
             self.ir_inc(instruction)
+            self.ir_load(instruction)
 
             ##self.basic_debug()
 
@@ -95,7 +98,6 @@ class CPU:
 
     def get_instruction(self):
         instruction = self.memory_bus.read_byte(self.program_counter)
-        print(instruction)
         program_step = 1
         instruction_definition = None
         if instruction == 0xCB:
@@ -132,42 +134,42 @@ class CPU:
             self.program_counter = addr
 
         if instruction.definition.name == 'JP_NZ':
-            if not self.flags.is_zero:
+            if not self.flags.is_zero():
                 self.jump_conditional(instruction)
 
         if instruction.definition.name == 'JP_NC':
-            if not self.flags.is_carry == 0:
+            if not self.flags.is_carry():
                 self.jump_conditional(instruction)
 
         if instruction.definition.name == 'JP_Z':
-            if self.flags.is_zero:
+            if self.flags.is_zero():
                 self.jump_conditional(instruction)
 
         if instruction.definition.name == 'JP_C':
-            if self.flags.is_carry:
+            if self.flags.is_carry():
                 self.jump_conditional(instruction)
 
         if instruction.definition.name == 'JPR_D16':
             next_addr = self.program_counter + 1
-            addr = (next_addr + instruction.operands[0] - 128) & 0xFFFF
+            addr = (next_addr + (instruction.operands[0] - 128)) & 0xFFFF
             self.program_counter = addr
 
         if instruction.definition.name == 'JPR_NZ':
-            if not self.flags.is_zero:
+            if not self.flags.is_zero():
                 self.jump_conditional_relative(instruction)
 
         if instruction.definition.name == 'JPR_NC':
-            if not self.flags.is_carry == 0:
+            if not self.flags.is_carry():
                 self.jump_conditional_relative(instruction)
 
 
         if instruction.definition.name == 'JPR_Z':
-            if self.flags.is_zero:
+            if self.flags.is_zero():
                 self.jump_conditional_relative(instruction)
 
 
         if instruction.definition.name == 'JPR_C':
-            if self.flags.is_carry:
+            if self.flags.is_carry():
                 self.jump_conditional_relative(instruction)
 
 
@@ -268,7 +270,7 @@ class CPU:
 
     def ir_opr_sp(self, instruction:Instruction):
         if instruction.definition.name == 'ADDSP_D8':
-            operand = (instruction.operands[0] - 127) & 0xFF
+            operand = (instruction.operands[0] - 128) & 0xFF
             new_sp = ( self.stack_pointer + operand ) & 0xFFFF
 
             self.flags.reset()
@@ -495,13 +497,13 @@ class CPU:
             self.flags.c = 1
 
     def jump_conditional(self, instruction:Instruction):
-        addr = instruction.operands[1] << 8 & instruction.operands[0]
+        addr = instruction.operands[1] << 8 | instruction.operands[0]
         self.program_counter = addr
         self.clock_cycle = self.clock_cycle + 1
 
     def jump_conditional_relative(self, instruction:Instruction):
         next_addr = self.program_counter + 1
-        addr = (next_addr + instruction.operands[0] - 128) & 0xFFFF
+        addr = (next_addr + (instruction.operands[0] - 128)) & 0xFFFF
         self.program_counter = addr
         self.clock_cycle = self.clock_cycle + 1
 
@@ -584,3 +586,228 @@ class CPU:
     def set_r_de(self, value):
         self.r_d = value >> 8
         self.r_e = value & 0xFF
+
+
+    ## changing the code convention only to write the infinite list of load instructions
+    ## these are pretty simple instructions but this CPU has a lot of then
+    def ir_load(self, instruction:Instruction):
+        match instruction.definition.name:
+            case 'LD_B_B':
+                self.r_b = self.r_b
+            case 'LD_B_C':
+                self.r_b = self.r_c
+            case 'LD_B_D':
+                self.r_b = self.r_d
+            case 'LD_B_E':
+                self.r_b = self.r_e
+            case 'LD_B_H':
+                self.r_b = self.r_h
+            case 'LD_B_L':
+                self.r_b = self.r_l
+            case 'LD_B_A':
+                self.r_b = self.r_a
+
+            case 'LD_C_B':
+                self.r_c = self.r_b
+            case 'LD_C_C':
+                self.r_c = self.r_c
+            case 'LD_c_D':
+                self.r_c = self.r_d
+            case 'LD_C_E':
+                self.r_c = self.r_e
+            case 'LD_C_H':
+                self.r_c = self.r_h
+            case 'LD_C_L':
+                self.r_c = self.r_l
+            case 'LD_C_A':
+                self.r_c = self.r_a
+
+            case 'LD_D_B':
+                self.r_d = self.r_b
+            case 'LD_D_C':
+                self.r_d = self.r_c
+            case 'LD_D_D':
+                self.r_d = self.r_d
+            case 'LD_D_E':
+                self.r_d = self.r_e
+            case 'LD_D_H':
+                self.r_d = self.r_h
+            case 'LD_D_L':
+                self.r_d = self.r_l
+            case 'LD_D_A':
+                self.r_d = self.r_a
+
+            case 'LD_E_B':
+                self.r_e = self.r_b
+            case 'LD_E_C':
+                self.r_e = self.r_c
+            case 'LD_E_D':
+                self.r_e = self.r_d
+            case 'LD_E_E':
+                self.r_e = self.r_e
+            case 'LD_E_H':
+                self.r_e = self.r_h
+            case 'LD_E_L':
+                self.r_e = self.r_l
+            case 'LD_E_A':
+                self.r_e = self.r_a
+
+            case 'LD_H_B':
+                self.r_h = self.r_b
+            case 'LD_H_C':
+                self.r_h = self.r_c
+            case 'LD_H_D':
+                self.r_h = self.r_d
+            case 'LD_H_E':
+                self.r_h = self.r_e
+            case 'LD_H_H':
+                self.r_h = self.r_h
+            case 'LD_H_L':
+                self.r_h = self.r_l
+            case 'LD_H_A':
+                self.r_h = self.r_a
+
+            case 'LD_L_B':
+                self.r_l = self.r_b
+            case 'LD_L_C':
+                self.r_l = self.r_c
+            case 'LD_L_D':
+                self.r_l = self.r_d
+            case 'LD_L_E':
+                self.r_l = self.r_e
+            case 'LD_L_H':
+                self.r_l = self.r_h
+            case 'LD_L_L':
+                self.r_l = self.r_l
+            case 'LD_L_A':
+                self.r_l = self.r_a
+
+            case 'LD_A_B':
+                self.r_a = self.r_b
+            case 'LD_A_C':
+                self.r_a = self.r_c
+            case 'LD_A_D':
+                self.r_a = self.r_d
+            case 'LD_A_E':
+                self.r_a = self.r_e
+            case 'LD_A_H':
+                self.r_a = self.r_h
+            case 'LD_A_L':
+                self.r_a = self.r_l
+            case 'LD_A_A':
+                self.r_a = self.r_a
+
+            case 'LD_HL_B':
+                self.memory_bus.write_byte(self.get_r_hl(), self.r_b)
+            case 'LD_HL_C':
+                self.memory_bus.write_byte(self.get_r_hl(), self.r_c)
+            case 'LD_HL_D':
+                self.memory_bus.write_byte(self.get_r_hl(), self.r_d)
+            case 'LD_HL_E':
+                self.memory_bus.write_byte(self.get_r_hl(), self.r_e)
+            case 'LD_HL_H':
+                self.memory_bus.write_byte(self.get_r_hl(), self.r_h)
+            case 'LD_HL_L':
+                self.memory_bus.write_byte(self.get_r_hl(), self.r_l)
+            case 'LD_HL_A':
+                self.memory_bus.write_byte(self.get_r_hl(), self.r_a)
+
+            case 'LD_B_HL':
+                self.r_b = self.memory_bus.read_byte(self.get_r_hl())
+            case 'LD_C_HL':
+                self.r_c = self.memory_bus.read_byte(self.get_r_hl())
+            case 'LD_D_HL':
+                self.r_d = self.memory_bus.read_byte(self.get_r_hl())
+            case 'LD_E_HL':
+                self.r_e = self.memory_bus.read_byte(self.get_r_hl())
+            case 'LD_H_HL':
+                self.r_h = self.memory_bus.read_byte(self.get_r_hl())
+            case 'LD_L_HL':
+                self.r_l = self.memory_bus.read_byte(self.get_r_hl())
+            case 'LD_A_HL':
+                self.r_a = self.memory_bus.read_byte(self.get_r_hl())
+
+            case 'LD_B_D8':
+                self.r_b = instruction.operands[0]
+            case 'LD_C_D8':
+                self.r_c = instruction.operands[0]
+            case 'LD_D_D8':
+                self.r_d = instruction.operands[0]
+            case 'LD_E_D8':
+                self.r_e = instruction.operands[0]
+            case 'LD_H_D8':
+                self.r_h = instruction.operands[0]
+            case 'LD_L_D8':
+                self.r_l = instruction.operands[0]
+            case 'LD_A_D8':
+                self.r_a = instruction.operands[0]
+            case 'LD_HL_D8':
+                self.memory_bus.write_byte(self.get_r_hl(), instruction.operands[0])
+
+            case 'LD_BC_D16':
+                value = instruction.operands[0] | (instruction.operands[1] << 8)
+                self.set_r_bc(value)
+            case 'LD_DE_D16':
+                value = instruction.operands[0] | (instruction.operands[1] << 8)
+                self.set_r_de(value)
+            case 'LD_HL_D16':
+                value = instruction.operands[0] | (instruction.operands[1] << 8)
+                self.set_r_hl(value)
+
+            case 'LD_SP_D16':
+                self.stack_pointer = instruction.operands[0] | instruction.operands[1] << 8
+            case 'LD_D16_SP':
+                least_byte = self.stack_pointer & 0xFF
+                most_byte = self.stack_pointer >> 8 
+                addr = instruction.operands[0] | instruction.operands[1] << 8
+                self.memory_bus.write_byte(addr, least_byte)
+                self.memory_bus.write_byte(addr, most_byte)
+            case 'LD_SP_HL':
+                self.stack_pointer = self.get_r_hl()
+            case 'LD_HL_SPe':
+                new_value = self.stack_pointer + ((instruction.operands[0] - 128) & 0xFF)
+                self.set_r_hl(new_value)
+                self.flags.z = 0
+                self.flags.n = 0
+                self.flags.h = (new_value & 0xF) + (self.stack_pointer & 0xF) > 0xF
+                self.flags.c = (new_value & 0xFF) + (self.stack_pointer & 0xFF) > 0xFF
+
+            case 'LD_BC_A':
+                self.memory_bus.write_byte(self.get_r_bc(), self.r_a)
+            case 'LD_DE_A':
+                self.memory_bus.write_byte(self.get_r_de(), self.r_a)
+            case 'LD_D16_A':
+                addr = instruction.operands[0] | instruction.operands[1] << 8
+                self.memory_bus.write_byte(addr, self.r_a)
+            case 'LDH_D8_A':
+                addr = 0xff00 + instruction.operands[0]
+                self.memory_bus.write_byte(addr, self.r_a)
+            case 'LDH_C_A':
+                addr = 0xff00 + self.r_c
+                self.memory_bus.write_byte(addr, self.r_a)
+            case 'LD_HLI_A':
+                self.memory_bus.write_byte(self.get_r_hl(), self.r_a)
+                self.set_r_hl(self.get_r_hl() + 1)
+            case 'LD_HLD_A':
+                self.memory_bus.write_byte(self.get_r_hl(), self.r_a)
+                self.set_r_hl(self.get_r_hl() - 1)
+
+            case 'LD_A_BC':
+                self.r_a = self.memory_bus.read_byte(self.get_r_bc())
+            case 'LD_A_DE':
+                self.r_a = self.memory_bus.read_byte(self.get_r_de())
+            case 'LD_A_D16':
+                addr = instruction.operands[0] | instruction.operands[1] << 8
+                self.r_a = self.memory_bus.read_byte(addr)
+            case 'LD_A_D8':
+                addr = 0xff00 + instruction.operands[0]
+                self.r_a = self.memory_bus.read_byte(addr)
+            case 'LD_A_C':
+                addr = 0xff00 + self.r_c
+                self.r_a = self.memory_bus.read_byte(addr)
+            case 'LD_A_HLI':
+                self.r_a = self.memory_bus.read_byte(self.get_r_hl())
+                self.set_r_hl(self.get_r_hl() + 1)
+            case 'LD_A_HLD':
+                self.r_a = self.memory_bus.read_byte(self.get_r_hl())
+                self.set_r_hl(self.get_r_hl() - 1)
