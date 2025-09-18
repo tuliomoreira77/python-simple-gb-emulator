@@ -25,7 +25,7 @@ OAM_BEGIN = 0xfe00
 OAM_END = 0xfe9f
 
 class MemoryBus:
-    memory = [0x00] * 0xFFFF
+    memory = [0x00] * (0xFFFF +1)
 
     def load_rom(self, rom):
         if(len(rom) > (ROM_END + 1)):
