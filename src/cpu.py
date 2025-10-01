@@ -27,15 +27,14 @@ class Flags:
         self.n = 0x1
     
     def set_half_carry(self):
-        self.c = 0x1
+        self.h = 0x1
 
 class CPU:
-    r_a = 0x01
+    r_a = 0x11
     r_b = 0x00
     r_c = 0x13
     r_d = 0x00
     r_e = 0xd8
-    r_f = 0xb0
     r_h = 0x01
     r_l = 0x4d
     flags = Flags()
@@ -47,12 +46,11 @@ class CPU:
 
     clock_cycle = 0
 
-    memory_bus = MemoryBus()
     alu = ALU()
-    ppu = PPU(memory_bus)
 
-    def __init__(self, game_rom):
-        self.memory_bus.load_rom(game_rom)
+    def __init__(self, memory_bus:MemoryBus, ppu:PPU):
+        self.memory_bus = memory_bus
+        self.ppu = ppu
 
     def basic_debug(self):
         print("Register E: {}".format(self.r_e))
@@ -61,10 +59,23 @@ class CPU:
         print("Flags h: {}".format(self.flags.h)) 
         print("Flags c: {}".format(self.flags.c)) 
 
-    def execute(self):
-        while(True):
+    def execute_step(self, step_count=1):
+        count = 0
+        while count < step_count:
             instruction = self.get_instruction()
             self.instruction_router(instruction)
+            print(instruction.definition.name, hex(instruction.operands[1]), hex(instruction.operands[0]))
+            count += 1
+
+    def execute(self):
+        cycle = 0
+        while(True):
+            ##time.sleep(0.1)
+            cycle += 1
+            instruction = self.get_instruction()
+            self.instruction_router(instruction)
+            if cycle % 100000 == 0:
+                self.ppu.basic_render()
 
 
     def get_instruction(self):
@@ -78,11 +89,10 @@ class CPU:
         else:
             instruction_definition = INSTRUCTION_DICT.get(instruction, None)
 
-        if(instruction_definition is None):
-            self.program_counter = self.program_counter + program_step
-            return Instruction(INSTRUCTION_DICT[0x00], [])
+        if instruction_definition == None:
+            print(hex(instruction))
 
-        operands = [0x00] * instruction_definition.operands_number
+        operands = [0x00] * 2
         if instruction_definition.operands_number > 0:
             for i in range(instruction_definition.operands_number):
                 operands[i] = self.memory_bus.read_byte(self.program_counter + program_step)
@@ -103,6 +113,7 @@ class CPU:
         self.ir_inc(instruction)
         self.ir_sub_u8(instruction)
         self.ir_or(instruction)
+        self.ir_xor(instruction)
         self.ir_compare(instruction)
 
         ##Bit operations
@@ -110,11 +121,13 @@ class CPU:
         self.ir_complement(instruction)
         self.ir_rl(instruction)
         self.ir_rr(instruction)
+        self.ir_shift_right_l(instruction)
 
         ##Jumps and routines
         self.ir_jump(instruction)
         self.ir_opr_sp(instruction)
         self.ir_call(instruction)
+        self.ir_rst(instruction)
         self.ir_ret(instruction)
         self.ir_interrupt(instruction)
         
@@ -126,8 +139,7 @@ class CPU:
     def ir_jump(self, instruction:Instruction):
         if instruction.definition.name == 'JP_HL':
             addr = self.get_r_hl()
-            jump_location = self.memory_bus.read_byte(addr)
-            self.program_counter = jump_location
+            self.program_counter = addr
 
         if instruction.definition.name == 'JP_D16':
             addr = instruction.operands[1] << 8 | instruction.operands[0]
@@ -150,7 +162,7 @@ class CPU:
                 self.jump_conditional(instruction)
 
         if instruction.definition.name == 'JPR_D16':
-            next_addr = self.program_counter + 1
+            next_addr = self.program_counter
             addr = self.alu.add_as_sig(next_addr, instruction.operands[0])
             self.program_counter = addr
 
@@ -192,6 +204,33 @@ class CPU:
             if self.flags.c == 1:
                 self.call(instruction)
                 self.clock_cycle = self.clock_cycle + 3
+
+    def ir_rst(self, instruction:Instruction):
+        match instruction.definition.name:
+            case 'RST_0':
+                instruction.operands[0] = 0x00
+                self.call(instruction)
+            case 'RST_1':
+                instruction.operands[0] = 0x08
+                self.call(instruction)
+            case 'RST_2':
+                instruction.operands[0] = 0x10
+                self.call(instruction)
+            case 'RST_3':
+                instruction.operands[0] = 0x18
+                self.call(instruction)
+            case 'RST_4':
+                instruction.operands[0] = 0x20
+                self.call(instruction)
+            case 'RST_5':
+                instruction.operands[0] = 0x28
+                self.call(instruction)
+            case 'RST_6':
+                instruction.operands[0] = 0x30
+                self.call(instruction)
+            case 'RST_7':
+                instruction.operands[0] = 0x38
+                self.call(instruction)
 
     def ir_ret(self, instruction:Instruction):
         if instruction.definition.name == 'RET_D16':
@@ -313,7 +352,7 @@ class CPU:
     def ir_opr_sp(self, instruction:Instruction):
         match instruction.definition.name:
             case 'ADDSP_D8':
-                operand = self.alu.to_signed(instruction.operands[0])
+                operand = instruction.operands[0]
                 new_sp = self.alu.add_as_sig(self.stack_pointer, instruction.operands[0])
 
                 self.flags.reset()
@@ -328,11 +367,8 @@ class CPU:
                 self.stack_pointer = self.stack_pointer - 1
                 self.memory_bus.write_byte(self.stack_pointer, self.r_a)
                 self.stack_pointer = self.stack_pointer - 1
-                self.memory_bus.write_byte(self.stack_pointer, self.r_f)
-                self.flags.z = (self.r_f >> 7) & 0x01
-                self.flags.n = (self.r_f >> 6) & 0x01
-                self.flags.h = (self.r_f >> 5) & 0x01
-                self.flags.c = (self.r_f >> 4) & 0x01
+                virtual_rf = self.flags.z << 7  | self.flags.n << 6  | self.flags.h << 5  | self.flags.c << 4 
+                self.memory_bus.write_byte(self.stack_pointer, virtual_rf)
 
             case 'PUSH_BC':
                 self.stack_pointer = self.stack_pointer - 1
@@ -353,32 +389,32 @@ class CPU:
                 self.memory_bus.write_byte(self.stack_pointer, self.r_l)
 
             case 'POP_AF':
-                self.r_f = self.memory_bus.read_byte(self.stack_pointer)
-                self.stack_pointer = self.stack_pointer - 1
+                virtual_rf = self.memory_bus.read_byte(self.stack_pointer)
+                self.stack_pointer = self.stack_pointer + 1
                 self.r_a = self.memory_bus.read_byte(self.stack_pointer)
-                self.stack_pointer = self.stack_pointer - 1
-                self.flags.z = (self.r_f >> 7) & 0x01
-                self.flags.n = (self.r_f >> 6) & 0x01
-                self.flags.h = (self.r_f >> 5) & 0x01
-                self.flags.c = (self.r_f >> 4) & 0x01
+                self.stack_pointer = self.stack_pointer + 1
+                self.flags.z = (virtual_rf >> 7) & 0x01
+                self.flags.n = (virtual_rf >> 6) & 0x01
+                self.flags.h = (virtual_rf >> 5) & 0x01
+                self.flags.c = (virtual_rf >> 4) & 0x01
 
             case 'POP_BC':
                 self.r_c = self.memory_bus.read_byte(self.stack_pointer)
-                self.stack_pointer = self.stack_pointer - 1
+                self.stack_pointer = self.stack_pointer + 1
                 self.r_b = self.memory_bus.read_byte(self.stack_pointer)
-                self.stack_pointer = self.stack_pointer - 1
+                self.stack_pointer = self.stack_pointer + 1
 
             case 'POP_DE':
                 self.r_e = self.memory_bus.read_byte(self.stack_pointer)
-                self.stack_pointer = self.stack_pointer - 1
+                self.stack_pointer = self.stack_pointer + 1
                 self.r_d = self.memory_bus.read_byte(self.stack_pointer)
-                self.stack_pointer = self.stack_pointer - 1
+                self.stack_pointer = self.stack_pointer + 1
 
             case 'POP_HL':
                 self.r_l = self.memory_bus.read_byte(self.stack_pointer)
-                self.stack_pointer = self.stack_pointer - 1
+                self.stack_pointer = self.stack_pointer + 1
                 self.r_h = self.memory_bus.read_byte(self.stack_pointer)
-                self.stack_pointer = self.stack_pointer - 1
+                self.stack_pointer = self.stack_pointer + 1
 
 
     def ir_and_u8(self, instruction:Instruction):
@@ -427,6 +463,27 @@ class CPU:
             case 'BIT_HL':
                 operand = self.memory_bus.read_byte(self.get_r_hl())
                 self.bit_u8(operand, bit)
+
+    def ir_shift_right_l(self, instruction:Instruction):
+        match instruction.definition.name:
+            case 'SRL_B':
+                self.r_b = self.shift_right_l(self.r_b)
+            case 'SRL_C':
+                self.r_c = self.shift_right_l(self.r_c)
+            case 'SRL_D':
+                self.r_d = self.shift_right_l(self.r_d)
+            case 'SRL_E':
+                self.r_e = self.shift_right_l(self.r_e)
+            case 'SRL_H':
+                self.r_h = self.shift_right_l(self.r_h)
+            case 'SRL_L':
+                self.r_l = self.shift_right_l(self.r_l)
+            case 'SRL_A':
+                self.r_a = self.shift_right_l(self.r_a)
+            case 'SRL_HL':
+                operand = self.memory_bus.read_byte(self.get_r_hl())
+                result = self.shift_right_l(operand)
+                self.memory_bus.write_byte(self.get_r_hl(), result)
 
     def ir_complement(self, instruction:Instruction):
         match instruction.definition.name:
@@ -552,8 +609,10 @@ class CPU:
         match instruction.definition.name:
             case 'DI':
                 self.interrupts_enabled = False
+                self.memory_bus.write_byte(0xFFFF, 0x00)
             case 'EI':
                 self.interrupts_enabled = True
+                self.memory_bus.write_byte(0xFFFF, 0xFF)
             case 'HALT':
                 self.is_halt = True
 
@@ -578,6 +637,28 @@ class CPU:
                 self.or_u8(operand)
             case 'OR_D8':
                 self.or_u8(instruction.operands[0])
+
+    def ir_xor(self, instruction:Instruction):
+        match instruction.definition.name:
+            case 'XOR_B':
+                self.xor_u8(self.r_b)
+            case 'XOR_C':
+                self.xor_u8(self.r_c)
+            case 'XOR_D':
+                self.xor_u8(self.r_d)
+            case 'XOR_E':
+                self.xor_u8(self.r_e)
+            case 'XOR_H':
+                self.xor_u8(self.r_h)
+            case 'XOR_L':
+                self.xor_u8(self.r_l) 
+            case 'XOR_A':
+                self.xor_u8(self.r_a)
+            case 'XOR_HL':
+                operand = self.memory_bus.read_byte(self.get_r_hl())
+                self.xor_u8(operand)
+            case 'XOR_D8':
+                self.xor_u8(instruction.operands[0])
 
     def ir_rl(self, instruction:Instruction):
         match instruction.definition.name:
@@ -683,22 +764,30 @@ class CPU:
         self.flags.reset()
         self.flags.c = 0x01 if self.alu.overflow else 0x00
         self.flags.z = 0x01 if result == 0 else 0x00
+        return result
 
     def rotate_r_carry(self, operand):
         result = self.alu.rotate_right_carry(operand)
         self.flags.reset()
         self.flags.c = 0x01 if self.alu.overflow else 0x00
         self.flags.z = 0x01 if result == 0 else 0x00
+        return result
 
+    def shift_right_l(self, operand):
+        result = self.alu.shift_right_logical(operand)
+        self.flags.reset()
+        self.flags.c = 0x01 if self.alu.overflow else 0x00
+        self.flags.z = 0x01 if result == 0 else 0x00
+        return result
 
     def set_flags_inc(self, operand):
         self.flags.z = 0
         self.flags.n = 0
-        self.flags. h = 0
+        self.flags.h = 0
 
         if (operand & 0xFF) == 0:
             self.flags.z = 1
-        if (operand & 0xF) + 1 > 0xF:
+        if ((operand - 1) & 0xF) + 1 > 0xF:
             self.flags.h = 1
 
 
@@ -707,13 +796,11 @@ class CPU:
         self.flags.z = 0
         self.flags.h = 0
 
-        if (operand & 0xF) - 1 < 0:
+        if ((operand + 1) & 0xF) - 1 < 0:
             self.flags.h = 1
 
         if (operand & 0xFF) == 0:
             self.flags.z = 1
-
-        self.flags.n = 1
 
     
     def compare(self, operand):
@@ -744,20 +831,23 @@ class CPU:
         next_line = self.program_counter
         least_byte = next_line & 0xFF
         most_byte = (next_line >> 8) & 0xFF
-        self.memory_bus.write_byte(self.stack_pointer -1, most_byte)
-        self.memory_bus.write_byte(self.stack_pointer -2, least_byte)
-        self.stack_pointer = self.stack_pointer -2
+        
+        self.stack_pointer -= 1
+        self.memory_bus.write_byte(self.stack_pointer, most_byte)
+        self.stack_pointer -= 1
+        self.memory_bus.write_byte(self.stack_pointer, least_byte)
         addr = instruction.operands[1] << 8 | instruction.operands[0]
         self.program_counter = addr
 
     def ret(self, instruction:Instruction):
         least_byte = self.memory_bus.read_byte(self.stack_pointer)
-        most_byte = self.memory_bus.read_byte(self.stack_pointer + 1)
-        self.program_counter = (most_byte << 8 & least_byte) & 0xFFFF
-        self.stack_pointer = self.stack_pointer + 2
+        self.stack_pointer += 1
+        most_byte = self.memory_bus.read_byte(self.stack_pointer)
+        self.stack_pointer += 1
+        self.program_counter = (most_byte << 8 | least_byte) & 0xFFFF
 
     def add_u8(self, operand, is_carry = False):
-        carry = 0x01 if is_carry & self.flags.is_carry() else 0x00
+        carry = 0x01 if is_carry & self.flags.c else 0x00
         op_result = self.alu.add_u8(self.r_a, operand)
         first_op_carry = self.alu.overflow 
         op_result = self.alu.add_u8(op_result, carry)
@@ -785,7 +875,7 @@ class CPU:
         self.set_r_hl(op_result)
 
     def sub_u8(self, operand, is_carry = False):
-        carry = 0x01 if is_carry & self.flags.is_carry() else 0x00
+        carry = 0x01 if is_carry & self.flags.c else 0x00
         op_result = self.alu.sub_u8(self.r_a, operand)
         first_op_carry = self.alu.overflow
         op_result = self.alu.sub_u8(op_result, carry)
@@ -816,6 +906,13 @@ class CPU:
             self.flags.z = 1
         self.r_a = op_result
 
+    def xor_u8(self, operand):
+        op_result = self.alu.xor_u8(self.r_a, operand)
+        self.flags.reset()
+        if op_result == 0:
+            self.flags.z = 1
+        self.r_a = op_result
+
     def bit_u8(self, operand, bit):
         result = (operand >> bit) & 0x1
         
@@ -825,13 +922,13 @@ class CPU:
             self.flags.z = 1
 
     def get_r_hl(self):
-        return (self.r_h << 8) | (self.r_l & 0xFF)
+        return (self.r_h << 8) | (self.r_l)
     
     def get_r_bc(self):
-        return (self.r_b << 8) | (self.r_c & 0xFF)
+        return (self.r_b << 8) | (self.r_c)
     
     def get_r_de(self):
-        return (self.r_d << 8) | (self.r_e & 0xFF)
+        return (self.r_d << 8) | (self.r_e)
     
     def set_r_hl(self, value):
         self.r_h = value >> 8
@@ -1002,40 +1099,40 @@ class CPU:
             case 'LD_HL_D8':
                 self.memory_bus.write_byte(self.get_r_hl(), instruction.operands[0])
 
-            case 'LD_BC_D16':
+            case 'LD16_BC_D16':
                 value = instruction.operands[0] | (instruction.operands[1] << 8)
                 self.set_r_bc(value)
-            case 'LD_DE_D16':
+            case 'LD16_DE_D16':
                 value = instruction.operands[0] | (instruction.operands[1] << 8)
                 self.set_r_de(value)
-            case 'LD_HL_D16':
+            case 'LD16_HL_D16':
                 value = instruction.operands[0] | (instruction.operands[1] << 8)
                 self.set_r_hl(value)
 
-            case 'LD_SP_D16':
-                self.stack_pointer = instruction.operands[0] | instruction.operands[1] << 8
-            case 'LD_D16_SP':
+            case 'LD16_SP_D16':
+                self.stack_pointer = instruction.operands[0] | (instruction.operands[1] << 8)
+            case 'LDS_D16_SP':
                 least_byte = self.stack_pointer & 0xFF
                 most_byte = self.stack_pointer >> 8 
-                addr = instruction.operands[0] | instruction.operands[1] << 8
+                addr = instruction.operands[0] | (instruction.operands[1] << 8)
                 self.memory_bus.write_byte(addr, least_byte)
-                self.memory_bus.write_byte(addr, most_byte)
-            case 'LD_SP_HL':
+                self.memory_bus.write_byte(addr + 1, most_byte)
+            case 'LDS_SP_HL':
                 self.stack_pointer = self.get_r_hl()
-            case 'LD_HL_SPe':
-                new_value = (self.stack_pointer + self.to_signed(instruction.operands[0])) & 0xFF
+            case 'LDS_HL_SPe':
+                new_value = self.alu.add_as_sig(self.stack_pointer, instruction.operands[0])
                 self.set_r_hl(new_value)
                 self.flags.z = 0
                 self.flags.n = 0
                 self.flags.h = (new_value & 0xF) + (self.stack_pointer & 0xF) > 0xF
                 self.flags.c = (new_value & 0xFF) + (self.stack_pointer & 0xFF) > 0xFF
 
-            case 'LD_BC_A':
+            case 'LDP_BC_A':
                 self.memory_bus.write_byte(self.get_r_bc(), self.r_a)
-            case 'LD_DE_A':
+            case 'LDP_DE_A':
                 self.memory_bus.write_byte(self.get_r_de(), self.r_a)
-            case 'LD_D16_A':
-                addr = instruction.operands[0] | instruction.operands[1] << 8
+            case 'LDP_D16_A':
+                addr = instruction.operands[0] | (instruction.operands[1] << 8)
                 self.memory_bus.write_byte(addr, self.r_a)
             case 'LDH_D8_A':
                 addr = 0xff00 + instruction.operands[0]
@@ -1043,29 +1140,29 @@ class CPU:
             case 'LDH_C_A':
                 addr = 0xff00 + self.r_c
                 self.memory_bus.write_byte(addr, self.r_a)
-            case 'LD_HLI_A':
+            case 'LDP_HLI_A':
                 self.memory_bus.write_byte(self.get_r_hl(), self.r_a)
                 self.set_r_hl(self.get_r_hl() + 1)
-            case 'LD_HLD_A':
+            case 'LDP_HLD_A':
                 self.memory_bus.write_byte(self.get_r_hl(), self.r_a)
                 self.set_r_hl(self.get_r_hl() - 1)
 
-            case 'LD_A_BC':
+            case 'LDP_A_BC':
                 self.r_a = self.memory_bus.read_byte(self.get_r_bc())
-            case 'LD_A_DE':
+            case 'LDP_A_DE':
                 self.r_a = self.memory_bus.read_byte(self.get_r_de())
-            case 'LD_A_D16':
-                addr = instruction.operands[0] | instruction.operands[1] << 8
+            case 'LDP_A_D16':
+                addr = instruction.operands[0] | (instruction.operands[1] << 8)
                 self.r_a = self.memory_bus.read_byte(addr)
-            case 'LD_A_D8':
+            case 'LDH_A_D8':
                 addr = 0xff00 + instruction.operands[0]
                 self.r_a = self.memory_bus.read_byte(addr)
-            case 'LD_A_C':
+            case 'LDH_A_C':
                 addr = 0xff00 + self.r_c
                 self.r_a = self.memory_bus.read_byte(addr)
-            case 'LD_A_HLI':
+            case 'LDP_A_HLI':
                 self.r_a = self.memory_bus.read_byte(self.get_r_hl())
                 self.set_r_hl(self.get_r_hl() + 1)
-            case 'LD_A_HLD':
+            case 'LDP_A_HLD':
                 self.r_a = self.memory_bus.read_byte(self.get_r_hl())
                 self.set_r_hl(self.get_r_hl() - 1)

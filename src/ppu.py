@@ -85,6 +85,9 @@ class PPU:
         pixels = [0x0] * 8
         mask = 0b10000000
         for i in range(8):
-            pixel = ((most_byte_addr & mask) >> 6) | (least_byte_addr & mask)
+            most_bit = (most_byte_addr & mask) >> 7-i
+            least_bit = (least_byte_addr & mask) >> 7-i
+            pixel = most_bit << 1 | least_bit
             pixels[i] = pixel
+            mask = mask >> 1
         return pixels

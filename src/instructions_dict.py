@@ -204,30 +204,31 @@ INSTRUCTION_DICT = {
     0x3e: InstructionDefinition('LD_A_D8', 1, 2),
     0x36: InstructionDefinition('LD_HL_D8', 1, 3),
 
-    0x01: InstructionDefinition('LD_BC_D16', 2, 3),
-    0x11: InstructionDefinition('LD_DE_D16', 2, 3),
-    0x21: InstructionDefinition('LD_HL_D16', 2, 3),
+    0x02: InstructionDefinition('LDP_BC_A', 0, 2),
+    0x12: InstructionDefinition('LDP_DE_A', 0, 2),
+    0x0a: InstructionDefinition('LDP_A_BC', 0, 2),
+    0x1a: InstructionDefinition('LDP_A_DE', 0, 2),
+    0xfa: InstructionDefinition('LDP_A_D16', 2, 4),
+    0xea: InstructionDefinition('LDP_D16_A', 2, 4),
+    0x22: InstructionDefinition('LDP_HLI_A', 0, 2),
+    0x32: InstructionDefinition('LDP_HLD_A', 0, 2),
+    0x2a: InstructionDefinition('LDP_A_HLI', 0, 2),
+    0x3a: InstructionDefinition('LDP_A_HLD', 0, 2),
 
-    0x31: InstructionDefinition('LD_SP_D16', 2, 3),
-    0x08: InstructionDefinition('LD_D16_SP', 2, 5),
-    0xf9: InstructionDefinition('LD_SP_HL', 0, 1),
-    0xf8: InstructionDefinition('LD_HL_SPe', 1, 3),
+    0x01: InstructionDefinition('LD16_BC_D16', 2, 3),
+    0x11: InstructionDefinition('LD16_DE_D16', 2, 3),
+    0x21: InstructionDefinition('LD16_HL_D16', 2, 3),
+    0x31: InstructionDefinition('LD16_SP_D16', 2, 3),
+    
+    0x08: InstructionDefinition('LDS_D16_SP', 2, 5),
+    0xf9: InstructionDefinition('LDS_SP_HL', 0, 1),
+    0xf8: InstructionDefinition('LDS_HL_SPe', 1, 3),
 
-    0x02: InstructionDefinition('LD_BC_A', 0, 2),
-    0x12: InstructionDefinition('LD_DE_A', 0, 2),
-    0xea: InstructionDefinition('LD_D16_A', 2, 4),
-    0xe0: InstructionDefinition('LDH_D8_A', 1, 3),
+    0xf0: InstructionDefinition('LDH_A_D8', 1, 3),
+    0xf2: InstructionDefinition('LDH_A_C', 0, 2),
     0xe2: InstructionDefinition('LDH_C_A', 0, 2),
-    0x22: InstructionDefinition('LD_HLI_A', 0, 2),
-    0x32: InstructionDefinition('LD_HLD_A', 0, 2),
+    0xe0: InstructionDefinition('LDH_D8_A', 1, 3),
 
-    0x0a: InstructionDefinition('LD_A_BC', 0, 2),
-    0x1a: InstructionDefinition('LD_A_DE', 0, 2),
-    0xfa: InstructionDefinition('LD_A_D16', 2, 4),
-    0xf0: InstructionDefinition('LD_A_D8', 1, 3),
-    0xf2: InstructionDefinition('LD_A_C', 0, 2),
-    0x2a: InstructionDefinition('LD_A_HLI', 0, 2),
-    0x3a: InstructionDefinition('LD_A_HLD', 0, 2),
 
     0xb0: InstructionDefinition('OR_B', 0, 1),
     0xb1: InstructionDefinition('OR_C', 0, 1),
@@ -239,16 +240,15 @@ INSTRUCTION_DICT = {
     0xb6: InstructionDefinition('OR_HL', 0, 1),
     0xf6: InstructionDefinition('OR_D8', 0, 1),
 
-
-    0xf5: InstructionDefinition('POP_AF', 0, 3),
+    0xf1: InstructionDefinition('POP_AF', 0, 3),
     0xc1: InstructionDefinition('POP_BC', 0, 3),
-    0xd5: InstructionDefinition('POP_DE', 0, 3),
-    0xe5: InstructionDefinition('POP_HL', 0, 3),
+    0xd1: InstructionDefinition('POP_DE', 0, 3),
+    0xe1: InstructionDefinition('POP_HL', 0, 3),
 
-    0xf1: InstructionDefinition('PUSH_AF', 0, 4),
+    0xf5: InstructionDefinition('PUSH_AF', 0, 4),
     0xc5: InstructionDefinition('PUSH_BC', 0, 4),
-    0xd1: InstructionDefinition('PUSH_DE', 0, 4),
-    0xe1: InstructionDefinition('PUSH_HL', 0, 4),
+    0xd5: InstructionDefinition('PUSH_DE', 0, 4),
+    0xe5: InstructionDefinition('PUSH_HL', 0, 4),
 
     0x90: InstructionDefinition('SUB_B', 0 , 1),
     0x91: InstructionDefinition('SUB_C', 0 , 1),
@@ -269,6 +269,27 @@ INSTRUCTION_DICT = {
     0x9e: InstructionDefinition('SUBC_HL', 0 , 2),
     0x9f: InstructionDefinition('SUBC_A', 0 , 1),
     0xde: InstructionDefinition('SUBC_D8', 1 , 2),
+
+    0xa8: InstructionDefinition('XOR_B', 0, 1),
+    0xa9: InstructionDefinition('XOR_C', 0, 1),
+    0xaa: InstructionDefinition('XOR_D', 0, 1),
+    0xab: InstructionDefinition('XOR_E', 0, 1),
+    0xac: InstructionDefinition('XOR_H', 0, 1),
+    0xad: InstructionDefinition('XOR_L', 0, 1),
+    0xae: InstructionDefinition('XOR_HL', 0, 2),
+    0xaf: InstructionDefinition('XOR_A', 0, 1),
+    0xee: InstructionDefinition('XOR_D8', 1, 2),
+
+    0x1f: InstructionDefinition('RR_A', 0, 1),
+
+    0xc7: InstructionDefinition('RST_0', 0, 4),
+    0xd7: InstructionDefinition('RST_1', 0, 4),
+    0xe7: InstructionDefinition('RST_2', 0, 4),
+    0xf7: InstructionDefinition('RST_3', 0, 4),
+    0xcf: InstructionDefinition('RST_4', 0, 4),
+    0xdf: InstructionDefinition('RST_5', 0, 4),
+    0xef: InstructionDefinition('RST_6', 0, 4),
+    0xff: InstructionDefinition('RST_7', 0, 4),
 
 }
 
@@ -382,6 +403,24 @@ PREFIX_INSTRUCTION_DICT = {
     0x7e: InstructionDefinition('BIT_HL_7', 0, 2),
     0x7f: InstructionDefinition('BIT_A_7', 0, 2),
 
+    0x38: InstructionDefinition('SRL_B', 0 , 2),
+    0x39: InstructionDefinition('SRL_C', 0 , 2),
+    0x3a: InstructionDefinition('SRL_D', 0 , 2),
+    0x3b: InstructionDefinition('SRL_E', 0 , 2),
+    0x3c: InstructionDefinition('SRL_H', 0 , 2),
+    0x3d: InstructionDefinition('SRL_L', 0 , 2),
+    0x3e: InstructionDefinition('SRL_HL', 0 , 4),
+    0x3f: InstructionDefinition('SRL_A', 0 , 2),
+
+    0x30: InstructionDefinition('SWAP_B', 0, 2),
+    0x31: InstructionDefinition('SWAP_C', 0, 2),
+    0x32: InstructionDefinition('SWAP_D', 0, 2),
+    0x33: InstructionDefinition('SWAP_E', 0, 2),
+    0x34: InstructionDefinition('SWAP_H', 0, 2),
+    0x35: InstructionDefinition('SWAP_L', 0, 2),
+    0x36: InstructionDefinition('SWAP_HL', 0, 2),
+    0x37: InstructionDefinition('SWAP_A', 0, 2),
+
 }
 
 
@@ -397,11 +436,6 @@ PREFIX_INSTRUCTION_DICT = {
 ## SLA [HL]
 ## SRA r8
 ## SRA [HL]
-## SRL r8
-## SRL [HL]
 ## STOP
 ## SWAP r8
 ## SWAP [HL]
-## XOR A,r8
-## XOR A,[HL]
-## XOR A,n8
