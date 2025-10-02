@@ -78,6 +78,7 @@ INSTRUCTION_DICT = {
 
     0x3f: InstructionDefinition('CCF', 0, 1),
     0x2f: InstructionDefinition('CPL', 0, 1),
+    0x27: InstructionDefinition('DAA', 0, 1),
 
     0xb8: InstructionDefinition('CP_B', 0, 1),
     0xb9: InstructionDefinition('CP_C', 0, 1),
@@ -238,7 +239,7 @@ INSTRUCTION_DICT = {
     0xb5: InstructionDefinition('OR_L', 0, 1),
     0xb7: InstructionDefinition('OR_A', 0, 1),
     0xb6: InstructionDefinition('OR_HL', 0, 1),
-    0xf6: InstructionDefinition('OR_D8', 0, 1),
+    0xf6: InstructionDefinition('OR_D8', 1, 1),
 
     0xf1: InstructionDefinition('POP_AF', 0, 3),
     0xc1: InstructionDefinition('POP_BC', 0, 3),
@@ -424,7 +425,6 @@ PREFIX_INSTRUCTION_DICT = {
 }
 
 
-## DAA
 ## RES u3,r8
 ## RES u3,[HL]
 ## RETI
@@ -437,5 +437,3 @@ PREFIX_INSTRUCTION_DICT = {
 ## SRA r8
 ## SRA [HL]
 ## STOP
-## SWAP r8
-## SWAP [HL]

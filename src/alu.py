@@ -15,10 +15,8 @@ class ALU:
     
     def add_as_sig(self, u16, u8):
         self.overflow = False
-        byte = u8 & 0xFF
-        if byte > 127:
-            byte = byte - (255 + 1)
-        return (u16 + byte) & 0xFFFF
+        byte = self.to_signed(u8)
+        return self.add_u16(u16, byte)
     
     def sub_u8(self, a, b):
         self.overflow = False

@@ -57,7 +57,8 @@ class CPU_V2:
             'RR': self.rotate_right,
             'RRC': self.rotate_right_carry,
             'SRL': self.shift_right_logical,
-            'SWAP': self.swap
+            'SWAP': self.swap,
+            'DAA': self.decimal_adjust
         }
 
     def execute_step(self, step_count=1):
@@ -65,10 +66,12 @@ class CPU_V2:
         while count < step_count:
             instruction = self.get_instruction()
             self.instruction_router(instruction)
-            #print(instruction.definition.name, hex(instruction.operands[1]), hex(instruction.operands[0]))
+            ##print(instruction.definition.name, hex(instruction.operands[1]), hex(instruction.operands[0]))
             count += 1
-        self.ppu.basic_render()
-        time.sleep(300)
+            if count % 1000000 == 0:
+                self.ppu.basic_render()
+        print('FINISH')
+        time.sleep(3600)
 
     def get_instruction(self):
         instruction = self.memory_bus.read_byte(self.program_counter)
@@ -118,19 +121,20 @@ class CPU_V2:
                 operand = self.registers.get_8_from_id(operand_def)
 
         acumulator = self.registers.get_a()
-        result = self.alu.add_u8(acumulator, operand)
+        first_result = self.alu.add_u8(acumulator, operand)
         first_carry = self.alu.overflow
         first_half_carry = self.alu.verify_overflow(acumulator, operand, 3)
-        result = self.alu.add_u8(result, carry)
+
+        second_result = self.alu.add_u8(first_result, carry)
         second_carry = self.alu.overflow
-        second_half_carry = self.alu.verify_overflow(result, carry, 3)
+        second_half_carry = self.alu.verify_overflow(first_result, carry, 3)
     
-        self.registers.zero = True if result == 0 else False
+        self.registers.zero = True if second_result == 0 else False
         self.registers.negative = False
         self.registers.half_carry = first_half_carry | second_half_carry
         self.registers.carry = first_carry | second_carry
 
-        self.registers.set_a(result)
+        self.registers.set_a(second_result)
 
     def add_u16(self, instruction:Instruction):
         decoded_inst = instruction.definition.name.split('_')
@@ -248,19 +252,44 @@ class CPU_V2:
             case _:
                 operand = self.registers.get_8_from_id(operand_def)
 
-        result = self.alu.sub_u8(self.registers.get_a(), operand)
+        first_result = self.alu.sub_u8(self.registers.get_a(), operand)
         first_carry = self.alu.overflow
         first_half = self.alu.verify_borrow(self.registers.get_a(), operand, 3)
 
-        result = self.alu.sub_u8(result, carry)
+        second_result = self.alu.sub_u8(first_result, carry)
         second_carry = self.alu.overflow
-        second_half = self.alu.verify_borrow(result, carry, 3)
+        second_half = self.alu.verify_borrow(first_result, carry, 3)
 
-        self.registers.zero = True if result == 0 else False
+        self.registers.zero = True if second_result == 0 else False
         self.registers.negative = True
         self.registers.half_carry = first_half | second_half
         self.registers.carry = first_carry | second_carry
+        self.registers.set_a(second_result)
+
+    def decimal_adjust(self, instruction:Instruction):
+        new_carry = False
+        if self.registers.negative:
+            adjust = 0x00
+            if self.registers.half_carry:
+                adjust = self.alu.add_u8(adjust, 0x6)
+            if self.registers.carry:
+                adjust = self.alu.add_u8(adjust, 0x60)
+                new_carry = True
+            result = self.alu.sub_u8(self.registers.get_a(), adjust)
+        else:
+            a = self.registers.get_a()
+            adjust = 0x00
+            if self.registers.half_carry or a & 0xf > 0x9:
+                adjust = self.alu.add_u8(adjust, 0x6)
+            if self.registers.carry or a > 0x99:
+                adjust = self.alu.add_u8(adjust, 0x60)
+                new_carry = True
+            result = self.alu.add_u8(a, adjust)
         self.registers.set_a(result)
+        self.registers.zero = True if result == 0 else False
+        self.registers.half_carry = False
+        self.registers.carry = new_carry
+
 
     def compare(self, instruction:Instruction):
         decoded_inst = instruction.definition.name.split('_')
@@ -572,11 +601,9 @@ class CPU_V2:
 
     def disable_interrupt(self, instruction:Instruction):
         self.interrupts_enabled = False
-        self.memory_bus.write_byte(0xFFFF, 0x00)
 
     def enable_interrupt(self, instruction:Instruction):
         self.interrupts_enabled = True
-        self.memory_bus.write_byte(0xFFFF, 0xFF)
     
     def halt(self, instruction:Instruction):
         self.is_halt = True
@@ -673,7 +700,7 @@ class CPU_V2:
                 self.registers.zero = False
                 self.registers.negative = False
                 self.registers.half_carry = self.alu.verify_overflow(a, b, 3)
-                self.registers.carry = self.alu.overflow
+                self.registers.carry = self.alu.verify_overflow(a, b, 7)
 
     def load_high(self, instruction:Instruction):
         decoded_inst = instruction.definition.name.split('_')

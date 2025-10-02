@@ -38,6 +38,4 @@ class MemoryBus:
         return self.memory[addr] & 0xFF
     
     def write_byte(self, addr, value):
-        if(addr > VRAM_BEGIN and addr < VRAM_END):
-            print(hex(value))
         self.memory[addr] = value & 0xFF
