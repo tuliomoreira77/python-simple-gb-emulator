@@ -595,7 +595,3 @@ PREFIX_INSTRUCTION_DICT = {
 
 }
 
-## SLA r8
-## SLA [HL]
-## SRA r8
-## SRA [HL]

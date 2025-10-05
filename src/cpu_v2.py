@@ -8,16 +8,15 @@ import time
 class CPU_V2:
     program_counter = 0x0100
     stack_pointer = 0xfffe
-    interrupts_enabled = True
+    interrupts_enabled = False
     is_halt = False
     clock_cycle = 0
 
     registers = Registers()
     alu = ALU()
 
-    def __init__(self, memory_bus:MemoryBus, ppu:PPU):
+    def __init__(self, memory_bus:MemoryBus):
         self.memory_bus = memory_bus
-        self.ppu = ppu
 
         self._base_inst_handler = {
             'NOP': lambda x : 0,
@@ -73,17 +72,15 @@ class CPU_V2:
             'SCF': self.set_carry_flag
         }
 
-    def execute_step(self, step_count=1):
-        count = 0
-        while count < step_count:
-            instruction = self.get_instruction()
-            self.instruction_router(instruction)
-            ##print(instruction.definition.name, hex(instruction.operands[1]), hex(instruction.operands[0]))
-            count += 1
-            if count % 100000 == 0:
-                self.ppu.basic_render()
-        print('FINISH')
-        time.sleep(3600)
+    def execute_step(self):
+        self.clock_cycle = 0
+        instruction = self.get_instruction()
+        self.instruction_router(instruction)
+
+        if self.interrupts_enabled:
+            self.handle_interrupts()
+
+        return self.clock_cycle
 
     def get_instruction(self):
         instruction = self.memory_bus.read_byte(self.program_counter)
@@ -854,3 +851,42 @@ class CPU_V2:
 
     def build_u16_from_operands(self, instruction:Instruction):
         return instruction.operands[1] << 8 | instruction.operands[0]
+    
+    def handle_interrupts(self):
+        enabled_interrupts = self.verify_interrupt_enabled()
+        requested_interrupts = self.verify_interrupt_request()
+
+        for interrupt_index in requested_interrupts:
+            if interrupt_index in enabled_interrupts:
+                self.clock_cycle += 5
+                self.interrupts_enabled = False
+                indirect_instruction = Instruction(INSTRUCTION_DICT.get(0xcd), [INTERRUPT_VECTOR_MAP[interrupt_index], 0])
+                self.clear_interruption_request(interrupt_index)
+                self.call(indirect_instruction)
+    
+    def clear_interruption_request(self, interrupt_index):
+        interrupt_flag = self.memory_bus.read_byte(INTERRUPT_FLAG)
+        cleared_state = self.alu.reset_bit(interrupt_flag, interrupt_index)
+        self.memory_bus.write_byte(INTERRUPT_FLAG, cleared_state)
+    
+    def verify_interrupt_enabled(self):
+        interrupt_enable = self.memory_bus.read_byte(INTERRUPT_ENABLE_REGISTER)
+        enabled_interrupts = []
+
+        for i in range(5):
+            enabled = self.alu.verify_bit(interrupt_enable, i)
+            if enabled:
+                enabled_interrupts.append(i)
+
+        return enabled_interrupts
+
+    def verify_interrupt_request(self):
+        interrupt_flag = self.memory_bus.read_byte(INTERRUPT_FLAG)
+        
+        requested_interrupts = []
+        for i in range(5):
+            interrupt_requested = self.alu.verify_bit(interrupt_flag, i)
+            if interrupt_requested:
+                requested_interrupts.append(i)
+
+        return requested_interrupts
