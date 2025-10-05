@@ -27,13 +27,13 @@ class Screen:
         self.screen.fill((0, 0, 0))
         self.screen.set_at((100, 100), self.palette[3])
 
-        pygame.display.flip()
+        pygame.display.update()
 
     def draw_line(self, position_y, pixels):
         for i in range(SCREEN_WIDTH):
             self.screen.set_at((i, position_y), self.palette[pixels[i]])
 
-        pygame.display.flip()
+        pygame.display.update()
 
 
 ## steps to render BG

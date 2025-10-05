@@ -7,14 +7,14 @@ from motherboard import *
 #04 - PASSED
 #05 - PASSED
 #06 - PASSED
-#07 - FAILED 
+#07 - PASSED 
 #08 - PASSED
-#09 - FAILED
-#10 - FAILED
-#11 - FAILED
+#09 - PASSED
+#10 - PASSED
+#11 - PASSED
 
 def load_rom_file():
-    with open('../roms/02.gb', 'rb') as f:
+    with open('../roms/10.gb', 'rb') as f:
         binary_data = f.read()
         return binary_data
 

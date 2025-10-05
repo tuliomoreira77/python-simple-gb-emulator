@@ -121,6 +121,10 @@ INSTRUCTION_DICT = {
     0xf3: InstructionDefinition('DI', 0, 1),
     0xfb: InstructionDefinition('EI', 0, 1),
     0x76: InstructionDefinition('HALT', 0, 1),
+    0xd9: InstructionDefinition('RETI', 0, 4),
+    0x10: InstructionDefinition('STOP', 1, 0),
+
+    0x37: InstructionDefinition('SCF', 0, 1),
 
 
     ## Infinite load instructions
@@ -281,7 +285,10 @@ INSTRUCTION_DICT = {
     0xaf: InstructionDefinition('XOR_A', 0, 1),
     0xee: InstructionDefinition('XOR_D8', 1, 2),
 
-    0x1f: InstructionDefinition('RR_A', 0, 1),
+    0x07: InstructionDefinition('RLCA_A', 0, 1),
+    0x0f: InstructionDefinition('RRCA_A', 0 ,1),
+    0x17: InstructionDefinition('RLA_A', 0, 1),
+    0x1f: InstructionDefinition('RRA_A', 0, 1),
 
     0xc7: InstructionDefinition('RST_0', 0, 4),
     0xd7: InstructionDefinition('RST_1', 0, 4),
@@ -333,8 +340,8 @@ PREFIX_INSTRUCTION_DICT = {
     0x0f: InstructionDefinition('RRC_A', 0, 1),
     
     0x40: InstructionDefinition('BIT_B_0', 0, 2),
+    0x41: InstructionDefinition('BIT_C_0', 0, 2), 
     0x42: InstructionDefinition('BIT_D_0', 0, 2),
-    0x41: InstructionDefinition('BIT_C_0', 0, 2),
     0x43: InstructionDefinition('BIT_E_0', 0, 2),
     0x44: InstructionDefinition('BIT_H_0', 0, 2),
     0x45: InstructionDefinition('BIT_L_0', 0, 2),
@@ -347,7 +354,7 @@ PREFIX_INSTRUCTION_DICT = {
     0x4b: InstructionDefinition('BIT_E_1', 0, 2),
     0x4c: InstructionDefinition('BIT_H_1', 0, 2),
     0x4d: InstructionDefinition('BIT_L_1', 0, 2),
-    0x4e: InstructionDefinition('BIT_HL_1', 0, 2),
+    0x4e: InstructionDefinition('BIT_HL_1', 0, 3),
     0x4f: InstructionDefinition('BIT_A_1', 0, 2),
 
     0x50: InstructionDefinition('BIT_B_2', 0, 2),
@@ -356,7 +363,7 @@ PREFIX_INSTRUCTION_DICT = {
     0x53: InstructionDefinition('BIT_E_2', 0, 2),
     0x54: InstructionDefinition('BIT_H_2', 0, 2),
     0x55: InstructionDefinition('BIT_L_2', 0, 2),
-    0x56: InstructionDefinition('BIT_HL_2', 0, 2),
+    0x56: InstructionDefinition('BIT_HL_2', 0, 3),
     0x57: InstructionDefinition('BIT_A_2', 0, 2),
 
     0x58: InstructionDefinition('BIT_B_3', 0, 2),
@@ -365,7 +372,7 @@ PREFIX_INSTRUCTION_DICT = {
     0x5b: InstructionDefinition('BIT_E_3', 0, 2),
     0x5c: InstructionDefinition('BIT_H_3', 0, 2),
     0x5d: InstructionDefinition('BIT_L_3', 0, 2),
-    0x5e: InstructionDefinition('BIT_HL_3', 0, 2),
+    0x5e: InstructionDefinition('BIT_HL_3', 0, 3),
     0x5f: InstructionDefinition('BIT_A_3', 0, 2),
 
     0x60: InstructionDefinition('BIT_B_4', 0, 2),
@@ -374,7 +381,7 @@ PREFIX_INSTRUCTION_DICT = {
     0x63: InstructionDefinition('BIT_E_4', 0, 2),
     0x64: InstructionDefinition('BIT_H_4', 0, 2),
     0x65: InstructionDefinition('BIT_L_4', 0, 2),
-    0x66: InstructionDefinition('BIT_HL_4', 0, 2),
+    0x66: InstructionDefinition('BIT_HL_4', 0, 3),
     0x67: InstructionDefinition('BIT_A_4', 0, 2),
 
     0x68: InstructionDefinition('BIT_B_5', 0, 2),
@@ -383,7 +390,7 @@ PREFIX_INSTRUCTION_DICT = {
     0x6b: InstructionDefinition('BIT_E_5', 0, 2),
     0x6c: InstructionDefinition('BIT_H_5', 0, 2),
     0x6d: InstructionDefinition('BIT_L_5', 0, 2),
-    0x6e: InstructionDefinition('BIT_HL_5', 0, 2),
+    0x6e: InstructionDefinition('BIT_HL_5', 0, 3),
     0x6f: InstructionDefinition('BIT_A_5', 0, 2),
 
     0x70: InstructionDefinition('BIT_B_6', 0, 2),
@@ -392,7 +399,7 @@ PREFIX_INSTRUCTION_DICT = {
     0x73: InstructionDefinition('BIT_E_6', 0, 2),
     0x74: InstructionDefinition('BIT_H_6', 0, 2),
     0x75: InstructionDefinition('BIT_L_6', 0, 2),
-    0x76: InstructionDefinition('BIT_HL_6', 0, 2),
+    0x76: InstructionDefinition('BIT_HL_6', 0, 3),
     0x77: InstructionDefinition('BIT_A_6', 0, 2),
 
     0x78: InstructionDefinition('BIT_B_7', 0, 2),
@@ -401,7 +408,7 @@ PREFIX_INSTRUCTION_DICT = {
     0x7b: InstructionDefinition('BIT_E_7', 0, 2),
     0x7c: InstructionDefinition('BIT_H_7', 0, 2),
     0x7d: InstructionDefinition('BIT_L_7', 0, 2),
-    0x7e: InstructionDefinition('BIT_HL_7', 0, 2),
+    0x7e: InstructionDefinition('BIT_HL_7', 0, 3),
     0x7f: InstructionDefinition('BIT_A_7', 0, 2),
 
     0x38: InstructionDefinition('SRL_B', 0 , 2),
@@ -422,18 +429,173 @@ PREFIX_INSTRUCTION_DICT = {
     0x36: InstructionDefinition('SWAP_HL', 0, 2),
     0x37: InstructionDefinition('SWAP_A', 0, 2),
 
+
+    0x80: InstructionDefinition('RES_B_0', 0, 2),
+    0x81: InstructionDefinition('RES_C_0', 0, 2),
+    0x82: InstructionDefinition('RES_D_0', 0, 2),
+    0x83: InstructionDefinition('RES_E_0', 0, 2),
+    0x84: InstructionDefinition('RES_H_0', 0, 2),
+    0x85: InstructionDefinition('RES_L_0', 0, 2),
+    0x86: InstructionDefinition('RES_HL_0', 0, 4),
+    0x87: InstructionDefinition('RES_A_0', 0, 2),
+    
+    0x88: InstructionDefinition('RES_B_1', 0, 2),
+    0x89: InstructionDefinition('RES_C_1', 0, 2),
+    0x8a: InstructionDefinition('RES_D_1', 0, 2),
+    0x8b: InstructionDefinition('RES_E_1', 0, 2),
+    0x8c: InstructionDefinition('RES_H_1', 0, 2),
+    0x8d: InstructionDefinition('RES_L_1', 0, 2),
+    0x8e: InstructionDefinition('RES_HL_1', 0, 4),
+    0x8f: InstructionDefinition('RES_A_1', 0, 2),
+
+    0x90: InstructionDefinition('RES_B_2', 0, 2),
+    0x91: InstructionDefinition('RES_C_2', 0, 2),
+    0x92: InstructionDefinition('RES_D_2', 0, 2),
+    0x93: InstructionDefinition('RES_E_2', 0, 2),
+    0x94: InstructionDefinition('RES_H_2', 0, 2),
+    0x95: InstructionDefinition('RES_L_2', 0, 2),
+    0x96: InstructionDefinition('RES_HL_2', 0, 4),
+    0x97: InstructionDefinition('RES_A_2', 0, 2),
+    
+    0x98: InstructionDefinition('RES_B_3', 0, 2),
+    0x99: InstructionDefinition('RES_C_3', 0, 2),
+    0x9a: InstructionDefinition('RES_D_3', 0, 2),
+    0x9b: InstructionDefinition('RES_E_3', 0, 2),
+    0x9c: InstructionDefinition('RES_H_3', 0, 2),
+    0x9d: InstructionDefinition('RES_L_3', 0, 2),
+    0x9e: InstructionDefinition('RES_HL_3', 0, 4),
+    0x9f: InstructionDefinition('RES_A_3', 0, 2),
+
+    0xa0: InstructionDefinition('RES_B_4', 0, 2),
+    0xa1: InstructionDefinition('RES_C_4', 0, 2),
+    0xa2: InstructionDefinition('RES_D_4', 0, 2),
+    0xa3: InstructionDefinition('RES_E_4', 0, 2),
+    0xa4: InstructionDefinition('RES_H_4', 0, 2),
+    0xa5: InstructionDefinition('RES_L_4', 0, 2),
+    0xa6: InstructionDefinition('RES_HL_4', 0, 4),
+    0xa7: InstructionDefinition('RES_A_4', 0, 2),
+    
+    0xa8: InstructionDefinition('RES_B_5', 0, 2),
+    0xa9: InstructionDefinition('RES_C_5', 0, 2),
+    0xaa: InstructionDefinition('RES_D_5', 0, 2),
+    0xab: InstructionDefinition('RES_E_5', 0, 2),
+    0xac: InstructionDefinition('RES_H_5', 0, 2),
+    0xad: InstructionDefinition('RES_L_5', 0, 2),
+    0xae: InstructionDefinition('RES_HL_5', 0, 4),
+    0xaf: InstructionDefinition('RES_A_5', 0, 2),
+
+    0xb0: InstructionDefinition('RES_B_6', 0, 2),
+    0xb1: InstructionDefinition('RES_C_6', 0, 2),
+    0xb2: InstructionDefinition('RES_D_6', 0, 2),
+    0xb3: InstructionDefinition('RES_E_6', 0, 2),
+    0xb4: InstructionDefinition('RES_H_6', 0, 2),
+    0xb5: InstructionDefinition('RES_L_6', 0, 2),
+    0xb6: InstructionDefinition('RES_HL_6', 0, 4),
+    0xb7: InstructionDefinition('RES_A_6', 0, 2),
+    
+    0xb8: InstructionDefinition('RES_B_7', 0, 2),
+    0xb9: InstructionDefinition('RES_C_7', 0, 2),
+    0xba: InstructionDefinition('RES_D_7', 0, 2),
+    0xbb: InstructionDefinition('RES_E_7', 0, 2),
+    0xbc: InstructionDefinition('RES_H_7', 0, 2),
+    0xbd: InstructionDefinition('RES_L_7', 0, 2),
+    0xbe: InstructionDefinition('RES_HL_7', 0, 4),
+    0xbf: InstructionDefinition('RES_A_7', 0, 2),
+
+
+    0xc0: InstructionDefinition('SET_B_0', 0, 2),
+    0xc1: InstructionDefinition('SET_C_0', 0, 2),
+    0xc2: InstructionDefinition('SET_D_0', 0, 2),
+    0xc3: InstructionDefinition('SET_E_0', 0, 2),
+    0xc4: InstructionDefinition('SET_H_0', 0, 2),
+    0xc5: InstructionDefinition('SET_L_0', 0, 2),
+    0xc6: InstructionDefinition('SET_HL_0', 0, 4),
+    0xc7: InstructionDefinition('SET_A_0', 0, 2),
+    
+    0xc8: InstructionDefinition('SET_B_1', 0, 2),
+    0xc9: InstructionDefinition('SET_C_1', 0, 2),
+    0xca: InstructionDefinition('SET_D_1', 0, 2),
+    0xcb: InstructionDefinition('SET_E_1', 0, 2),
+    0xcc: InstructionDefinition('SET_H_1', 0, 2),
+    0xcd: InstructionDefinition('SET_L_1', 0, 2),
+    0xce: InstructionDefinition('SET_HL_1', 0, 4),
+    0xcf: InstructionDefinition('SET_A_1', 0, 2),
+
+    0xd0: InstructionDefinition('SET_B_2', 0, 2),
+    0xd1: InstructionDefinition('SET_C_2', 0, 2),
+    0xd2: InstructionDefinition('SET_D_2', 0, 2),
+    0xd3: InstructionDefinition('SET_E_2', 0, 2),
+    0xd4: InstructionDefinition('SET_H_2', 0, 2),
+    0xd5: InstructionDefinition('SET_L_2', 0, 2),
+    0xd6: InstructionDefinition('SET_HL_2', 0, 4),
+    0xd7: InstructionDefinition('SET_A_2', 0, 2),
+    
+    0xd8: InstructionDefinition('SET_B_3', 0, 2),
+    0xd9: InstructionDefinition('SET_C_3', 0, 2),
+    0xda: InstructionDefinition('SET_D_3', 0, 2),
+    0xdb: InstructionDefinition('SET_E_3', 0, 2),
+    0xdc: InstructionDefinition('SET_H_3', 0, 2),
+    0xdd: InstructionDefinition('SET_L_3', 0, 2),
+    0xde: InstructionDefinition('SET_HL_3', 0, 4),
+    0xdf: InstructionDefinition('SET_A_3', 0, 2),
+
+    0xe0: InstructionDefinition('SET_B_4', 0, 2),
+    0xe1: InstructionDefinition('SET_C_4', 0, 2),
+    0xe2: InstructionDefinition('SET_D_4', 0, 2),
+    0xe3: InstructionDefinition('SET_E_4', 0, 2),
+    0xe4: InstructionDefinition('SET_H_4', 0, 2),
+    0xe5: InstructionDefinition('SET_L_4', 0, 2),
+    0xe6: InstructionDefinition('SET_HL_4', 0, 4),
+    0xe7: InstructionDefinition('SET_A_4', 0, 2),
+    
+    0xe8: InstructionDefinition('SET_B_5', 0, 2),
+    0xe9: InstructionDefinition('SET_C_5', 0, 2),
+    0xea: InstructionDefinition('SET_D_5', 0, 2),
+    0xeb: InstructionDefinition('SET_E_5', 0, 2),
+    0xec: InstructionDefinition('SET_H_5', 0, 2),
+    0xed: InstructionDefinition('SET_L_5', 0, 2),
+    0xee: InstructionDefinition('SET_HL_5', 0, 4),
+    0xef: InstructionDefinition('SET_A_5', 0, 2),
+
+    0xf0: InstructionDefinition('SET_B_6', 0, 2),
+    0xf1: InstructionDefinition('SET_C_6', 0, 2),
+    0xf2: InstructionDefinition('SET_D_6', 0, 2),
+    0xf3: InstructionDefinition('SET_E_6', 0, 2),
+    0xf4: InstructionDefinition('SET_H_6', 0, 2),
+    0xf5: InstructionDefinition('SET_L_6', 0, 2),
+    0xf6: InstructionDefinition('SET_HL_6', 0, 4),
+    0xf7: InstructionDefinition('SET_A_6', 0, 2),
+    
+    0xf8: InstructionDefinition('SET_B_7', 0, 2),
+    0xf9: InstructionDefinition('SET_C_7', 0, 2),
+    0xfa: InstructionDefinition('SET_D_7', 0, 2),
+    0xfb: InstructionDefinition('SET_E_7', 0, 2),
+    0xfc: InstructionDefinition('SET_H_7', 0, 2),
+    0xfd: InstructionDefinition('SET_L_7', 0, 2),
+    0xfe: InstructionDefinition('SET_HL_7', 0, 4),
+    0xff: InstructionDefinition('SET_A_7', 0, 2),
+
+    0x20: InstructionDefinition('SLA_B', 0, 2),
+    0x21: InstructionDefinition('SLA_C', 0, 2),
+    0x22: InstructionDefinition('SLA_D', 0, 2),
+    0x23: InstructionDefinition('SLA_E', 0, 2),
+    0x24: InstructionDefinition('SLA_H', 0, 2),
+    0x25: InstructionDefinition('SLA_L', 0, 2),
+    0x26: InstructionDefinition('SLA_HL', 0, 4),
+    0x27: InstructionDefinition('SLA_A', 0, 2),
+
+    0x28: InstructionDefinition('SRA_B', 0, 2),
+    0x29: InstructionDefinition('SRA_C', 0, 2),
+    0x2a: InstructionDefinition('SRA_D', 0, 2),
+    0x2b: InstructionDefinition('SRA_E', 0, 2),
+    0x2c: InstructionDefinition('SRA_H', 0, 2),
+    0x2d: InstructionDefinition('SRA_L', 0, 2),
+    0x2e: InstructionDefinition('SRA_HL', 0, 4),
+    0x2f: InstructionDefinition('SRA_A', 0, 2),
+
 }
 
-
-## RES u3,r8
-## RES u3,[HL]
-## RETI
-## RST vec
-## SCF
-## SET u3,r8
-## SET u3,[HL]
 ## SLA r8
 ## SLA [HL]
 ## SRA r8
 ## SRA [HL]
-## STOP

@@ -75,7 +75,6 @@ class ALU:
         return operand & 0xFF
     
     def rotate_right(self, operand, carry):
-        self.overflow = False
         overflow = operand & 0x01
         operand = operand >> 1
         self.overflow = True if overflow == 1 else False
@@ -83,7 +82,6 @@ class ALU:
         return operand
 
     def rotate_right_carry(self, operand):
-        self.overflow = False
         overflow = operand & 0x01
         operand = operand >> 1
         self.overflow = True if overflow == 1 else False
@@ -91,16 +89,37 @@ class ALU:
         return operand
 
     def shift_right_logical(self, operand):
-        self.overflow = False
         overflow = operand & 0x01
         operand = operand >> 1
         self.overflow = True if overflow == 1 else False
         return operand
     
+    def shift_right_a(self, operand):
+        overflow = operand & 0x01
+        bit_7 = operand & 0x80
+        result = operand >> 1
+        result = result | bit_7
+        self.overflow = overflow == 1
+        return result
+        
+    def shift_left_a(self, operand):
+        overflow = (operand & 0x80) >> 7
+        result = (operand << 1) & 0xFF
+        self.overflow = True if overflow == 1 else False
+        return result
+    
     def swap_u8(self, operand):
         lower = operand & 0xF
         upper = operand >> 4
         return (lower << 4) | upper
+    
+    def reset_bit(self, operand, bit):
+        mask = ~(0x01 << bit)
+        return (operand & mask) & 0xff
+    
+    def set_bit(self, operand, bit):
+        mask = (0x01 << bit)
+        return (operand | mask) & 0xff
     
     def verify_overflow(self, a, b, bit):
         mask = ((0xFFFF << bit + 1) ^ 0xFFFF) & 0xFFFF
@@ -109,6 +128,9 @@ class ALU:
     def verify_borrow(self, a, b, bit):
         mask = ((0xFFFF << bit + 1) ^ 0xFFFF) & 0xFFFF
         return b & mask > a & mask
+    
+    def verify_bit(self, a, bit):
+        return True if ((a >> bit) & 0x1 == 1) else False
     
     def not_u8(self, a):
         return ~a & 0xFF

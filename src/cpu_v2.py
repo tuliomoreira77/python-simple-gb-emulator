@@ -21,6 +21,7 @@ class CPU_V2:
 
         self._base_inst_handler = {
             'NOP': lambda x : 0,
+            'STOP': lambda x: 0,
             'ADD': self.add_u8,
             'ADDC': self.add_u8,
             'JP': self.direct_jump,
@@ -39,6 +40,7 @@ class CPU_V2:
             'INC16': self.increment_u16,
             'DI': self.disable_interrupt,
             'EI': self.enable_interrupt,
+            'RETI': self.reti,
             'HALT': self.halt,
             'LD': self.basic_load,
             'LDP': self.pointer_load,
@@ -56,9 +58,19 @@ class CPU_V2:
             'RLC': self.rotate_left_carry,
             'RR': self.rotate_right,
             'RRC': self.rotate_right_carry,
+            'RLCA': self.rotate_left_a_carry,
+            'RRCA': self.rotate_right_a_carry,
+            'RLA': self.rotate_left_a,
+            'RRA': self.rotate_right_a,
             'SRL': self.shift_right_logical,
+            'SRA': self.shift_right_arithmacally,
+            'SLA': self.shift_left_arithmacally,
             'SWAP': self.swap,
-            'DAA': self.decimal_adjust
+            'DAA': self.decimal_adjust,
+            'BIT': self.bit,
+            'RES': self.reset,
+            'SET': self.set,
+            'SCF': self.set_carry_flag
         }
 
     def execute_step(self, step_count=1):
@@ -68,7 +80,7 @@ class CPU_V2:
             self.instruction_router(instruction)
             ##print(instruction.definition.name, hex(instruction.operands[1]), hex(instruction.operands[0]))
             count += 1
-            if count % 1000000 == 0:
+            if count % 100000 == 0:
                 self.ppu.basic_render()
         print('FINISH')
         time.sleep(3600)
@@ -102,6 +114,8 @@ class CPU_V2:
     def instruction_router(self, instruction:Instruction):
         decoded_base = instruction.definition.name.split('_')[0]
         base_handler = self._base_inst_handler.get(decoded_base)
+        if base_handler == None:
+            print(instruction.definition.name)
         base_handler(instruction)
 
     def add_u8(self, instruction:Instruction):
@@ -518,8 +532,9 @@ class CPU_V2:
         vector = [0x0 , 0x8 , 0x10 , 0x18 , 0x20 , 0x28 , 0x30 , 0x38]
         decoded_inst = instruction.definition.name.split('_')
         operand_def = decoded_inst[1]
-        instruction.operands[0] = vector[int(operand_def)]
-        self.call(instruction)
+
+        indirect_instruction = Instruction(INSTRUCTION_DICT.get(0xcd), [vector[int(operand_def)], 0])
+        self.call(indirect_instruction)
 
     def complement_carry(self, instruction:Instruction):
         self.registers.negative = False
@@ -533,6 +548,22 @@ class CPU_V2:
         acumulator = self.registers.get_a()
         result = self.alu.not_u8(acumulator)
         self.registers.set_a(result)
+
+    def rotate_left_a(self, instruction:Instruction):
+        self.shift_rotation_operations(instruction, self.alu.rotate_left, True)
+        self.registers.zero = False
+
+    def rotate_left_a_carry(self, instruction:Instruction):
+        self.shift_rotation_operations(instruction, self.alu.rotate_left_carry)
+        self.registers.zero = False
+
+    def rotate_right_a(self, instruction:Instruction):
+        self.shift_rotation_operations(instruction, self.alu.rotate_right, True)
+        self.registers.zero = False
+
+    def rotate_right_a_carry(self, instruction:Instruction):
+        self.shift_rotation_operations(instruction, self.alu.rotate_right_carry)
+        self.registers.zero = False
 
     def rotate_left(self, instruction:Instruction):
         self.shift_rotation_operations(instruction, self.alu.rotate_left, True)
@@ -548,6 +579,12 @@ class CPU_V2:
 
     def shift_right_logical(self, instruction:Instruction):
         self.shift_rotation_operations(instruction, self.alu.shift_right_logical)
+
+    def shift_right_arithmacally(self, instruction:Instruction):
+        self.shift_rotation_operations(instruction, self.alu.shift_right_a)
+
+    def shift_left_arithmacally(self, instruction:Instruction):
+        self.shift_rotation_operations(instruction, self.alu.shift_left_a)
 
     def shift_rotation_operations(self, instruction:Instruction, alu_opr, use_carry=False):
         decoded_inst = instruction.definition.name.split('_')
@@ -599,6 +636,51 @@ class CPU_V2:
         self.registers.half_carry = False
         self.registers.carry = False
 
+    def bit(self, instruction:Instruction):
+        decoded_inst = instruction.definition.name.split('_')
+        operand_def = decoded_inst[1]
+        bit_def = int(decoded_inst[2])
+
+        result = False
+        match operand_def:
+            case 'HL':
+                operand = self.memory_bus.read_byte(self.registers.get_hl())
+                result = self.alu.verify_bit(operand, bit_def)
+            case _:
+                operand = self.registers.get_8_from_id(operand_def)
+                result = self.alu.verify_bit(operand, bit_def)
+
+        self.registers.zero = not result
+        self.registers.negative = False
+        self.registers.half_carry = True
+
+    def reset(self, instruction:Instruction):
+        self.set_reset(instruction, self.alu.reset_bit)
+
+    def set(self, instruction:Instruction):
+        self.set_reset(instruction, self.alu.set_bit)
+
+    def set_reset(self, instruction:Instruction, bit_operation):
+        decoded_inst = instruction.definition.name.split('_')
+        operand_def = decoded_inst[1]
+        bit_def = int(decoded_inst[2])
+
+        result = 0x00
+        match operand_def:
+            case 'HL':
+                operand = self.memory_bus.read_byte(self.registers.get_hl())
+                result = bit_operation(operand, bit_def)
+                self.memory_bus.write_byte(self.registers.get_hl(), result)
+            case _:
+                operand = self.registers.get_8_from_id(operand_def)
+                result = bit_operation(operand, bit_def)
+                self.registers.set_8_from_id(operand_def, result)
+
+    def set_carry_flag(self, Instruction: Instruction):
+        self.registers.negative = False
+        self.registers.half_carry = False
+        self.registers.carry = True
+
     def disable_interrupt(self, instruction:Instruction):
         self.interrupts_enabled = False
 
@@ -607,6 +689,11 @@ class CPU_V2:
     
     def halt(self, instruction:Instruction):
         self.is_halt = True
+
+    def reti(self, instruction:Instruction):
+        self.enable_interrupt(instruction)
+        jump_addr = self.pop_from_stack()
+        self.program_counter = jump_addr
 
     def basic_load(self, instruction:Instruction):
         decoded_inst = instruction.definition.name.split('_')

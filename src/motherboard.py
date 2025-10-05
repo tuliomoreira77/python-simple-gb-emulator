@@ -1,7 +1,6 @@
 from bus import *
 from alu import *
 from ppu import *
-from cpu import *
 from cpu_v2 import *
 
 class Motherboard:
