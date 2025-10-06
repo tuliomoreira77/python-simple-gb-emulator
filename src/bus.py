@@ -1,3 +1,5 @@
+from calculator import *
+
 VBLANK_VECTOR = 0x40
 TIMER_VECTOR = 0x50
 LCDSTAT_VECTOR = 0x48
@@ -40,11 +42,12 @@ TIMER_MODULO = 0xFF06
 TIMER_CONTROL = 0xFF07
 
 class MemoryBus:
+    calculator = Calculator()
     memory = [0x00] * (0xFFFF +1)
 
     def load_rom(self, rom):
         if(len(rom) > (ROM_END + 1)):
-            raise "ROM SIZE INVALID"
+            raise "ROM SIZE INVALID" # pyright: ignore[reportGeneralTypeIssues]
 
         for i, rom_byte in enumerate(rom):
             self.memory[i] = rom_byte
@@ -59,19 +62,22 @@ class MemoryBus:
         
         self.memory[addr] = value & 0xFF
 
-    def inc_timer_div(self, addr, value):
-        value = self.memory[addr]
+    def inc_timer_div(self):
+        value = self.memory[TIMER_DIV]
         value = value + 1
-        self.memory[addr] = value & 0xFF
+        self.memory[TIMER_DIV] = value & 0xFF
 
-    def inc_timer_counter(self, addr, value):
-        value = self.memory[addr]
+    def inc_timer_counter(self):
+        value = self.memory[TIMER_COUNTER]
         value = value + 1
-        overflow = False
 
         if value > 0xFF:
-            overflow = True
+            self.request_timer_interrupt()
             value = self.memory[TIMER_MODULO]
 
-        self.memory[addr] = value
-        return overflow
+        self.memory[TIMER_COUNTER] = value
+
+    def request_timer_interrupt(self):
+        interrupt_request = self.memory[INTERRUPT_FLAG]
+        interrupt_request = self.calculator.set_bit(interrupt_request, 2)
+        self.memory[INTERRUPT_FLAG] = interrupt_request

@@ -18,15 +18,12 @@ class Screen:
     grey_1 = (85, 85, 85)
     grey_2 = (170, 170, 170)
 
-    palette = [black, grey_1, grey_2, white]
+    palette = [white, grey_2, grey_1, black]
 
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_LENGHT))
-
-        self.screen.fill((0, 0, 0))
-        self.screen.set_at((100, 100), self.palette[3])
-
+        self.screen.fill(self.black)
         pygame.display.update()
 
     def draw_line(self, position_y, pixels):
@@ -58,6 +55,9 @@ class PPU:
         self.screen = Screen()
         self.memory_bus = memory_bus
 
+    def step(self, cycles):
+        pass
+
     def basic_render(self):
         tile_map_addr = TILE_MAP_1_START
         for k in range (32):
@@ -70,7 +70,7 @@ class PPU:
                     pixels = self.read_tile_line(tile_addr, j)
                     pixel_line.extend(pixels)
 
-                self.screen.draw_line((k * 32) + j, pixel_line)
+                self.screen.draw_line((k * 8) + j, pixel_line)
 
         
 

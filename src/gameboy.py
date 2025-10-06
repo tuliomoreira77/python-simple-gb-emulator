@@ -2,7 +2,7 @@ from motherboard import *
 
 ### TESTE
 #01 - PASSED
-#02 - FAILED
+#02 - PASSED
 #03 - PASSED
 #04 - PASSED
 #05 - PASSED
@@ -14,7 +14,7 @@ from motherboard import *
 #11 - PASSED
 
 def load_rom_file():
-    with open('../roms/02.gb', 'rb') as f:
+    with open('../roms/timing.gb', 'rb') as f:
         binary_data = f.read()
         return binary_data
 

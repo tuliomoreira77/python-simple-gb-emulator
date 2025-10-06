@@ -1,4 +1,4 @@
-class ALU:
+class Calculator:
     overflow = False
 
     def add_u8(self, a, b):

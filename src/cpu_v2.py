@@ -1,9 +1,8 @@
 
 from instructions_dict import *
-from alu import *
+from calculator import *
 from ppu import *
 from basic_register import *
-import time
 
 class CPU_V2:
     program_counter = 0x0100
@@ -13,7 +12,7 @@ class CPU_V2:
     clock_cycle = 0
 
     registers = Registers()
-    alu = ALU()
+    alu = Calculator()
 
     def __init__(self, memory_bus:MemoryBus):
         self.memory_bus = memory_bus
@@ -74,11 +73,23 @@ class CPU_V2:
 
     def execute_step(self):
         self.clock_cycle = 0
-        instruction = self.get_instruction()
-        self.instruction_router(instruction)
 
-        if self.interrupts_enabled:
-            self.handle_interrupts()
+        if self.is_halt:
+            if self.verify_pending_interrupt() and self.interrupts_enabled:
+                self.is_halt = False
+                self.handle_interrupts()
+
+            if self.verify_pending_interrupt() and not self.interrupts_enabled:
+                self.is_halt = False
+            
+            self.clock_cycle += 1
+        
+        else:
+            instruction = self.get_instruction()
+            self.instruction_router(instruction)
+
+            if self.interrupts_enabled:
+                self.handle_interrupts()
 
         return self.clock_cycle
 
@@ -173,8 +184,8 @@ class CPU_V2:
 
         result = self.alu.add_as_sig(acumulator, operand)
 
-        self.registers.zero = 0
-        self.registers.negative = 0
+        self.registers.zero = False
+        self.registers.negative = False
         self.registers.half_carry = self.alu.verify_overflow(acumulator, operand, 3)
         self.registers.carry = self.alu.verify_overflow(acumulator, operand, 7)
 
@@ -685,7 +696,13 @@ class CPU_V2:
         self.interrupts_enabled = True
     
     def halt(self, instruction:Instruction):
-        self.is_halt = True
+        if self.interrupts_enabled:
+            self.is_halt = True
+        else:
+            if self.verify_pending_interrupt():
+                self.is_halt = False
+            else:
+                self.is_halt = True
 
     def reti(self, instruction:Instruction):
         self.enable_interrupt(instruction)
@@ -857,13 +874,19 @@ class CPU_V2:
         requested_interrupts = self.verify_interrupt_request()
 
         for interrupt_index in requested_interrupts:
+            self.is_halt = False
             if interrupt_index in enabled_interrupts:
                 self.clock_cycle += 5
                 self.interrupts_enabled = False
                 indirect_instruction = Instruction(INSTRUCTION_DICT.get(0xcd), [INTERRUPT_VECTOR_MAP[interrupt_index], 0])
                 self.clear_interruption_request(interrupt_index)
                 self.call(indirect_instruction)
-    
+
+    def verify_pending_interrupt(self):
+        interrupt_enable = self.memory_bus.read_byte(INTERRUPT_ENABLE_REGISTER)
+        interrupt_flag = self.memory_bus.read_byte(INTERRUPT_FLAG)
+        return interrupt_enable & interrupt_flag
+
     def clear_interruption_request(self, interrupt_index):
         interrupt_flag = self.memory_bus.read_byte(INTERRUPT_FLAG)
         cleared_state = self.alu.reset_bit(interrupt_flag, interrupt_index)
