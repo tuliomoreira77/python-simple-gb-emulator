@@ -14,13 +14,11 @@ from motherboard import *
 #11 - PASSED
 
 def load_rom_file():
-    with open('../roms/timing.gb', 'rb') as f:
+    with open('../roms/tetris.gb', 'rb') as f:
         binary_data = f.read()
         return binary_data
 
 rom = load_rom_file()
 motherboard = Motherboard(rom)
-
-motherboard.memory_bus.write_byte(0xFF41, 0b01010011)
 motherboard.run_cycles(50000000000000)
 

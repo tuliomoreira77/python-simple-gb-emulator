@@ -7,15 +7,38 @@ from basic_register import *
 class CPU_V2:
     program_counter = 0x0100
     stack_pointer = 0xfffe
-    interrupts_enabled = False
+    interrupts_enabled = True
     is_halt = False
     clock_cycle = 0
 
     registers = Registers()
     alu = Calculator()
 
+    def breakpoint(self):
+        break_address = [0x29D0, 0x29D5, 0x29DC]
+        if self.program_counter in break_address:
+            print('BREAK POINT')
+            print('Line : ', hex(self.program_counter))
+            print('Register AF: ', hex(self.registers.get_af()))
+            print('Register BC: ', hex(self.registers.get_bc()))
+            print('Register DE: ', hex(self.registers.get_de()))
+            print('Register HL: ', hex(self.registers.get_hl()))
+            print('Stack Pointer: ', hex(self.stack_pointer))
+            print('LCDC: ' , hex(self.memory_bus.read_byte(LCD_CONTROL)))
+            input('Continue....')
+
     def __init__(self, memory_bus:MemoryBus):
         self.memory_bus = memory_bus
+        self.registers.set_af(0xdfb0)
+        self.registers.set_bc(0x0013)
+        self.registers.set_de(0x00d8)
+        self.registers.set_hl(0x014d)
+        self.memory_bus.write_byte(INTERRUPT_ENABLE_REGISTER, 0x00)
+        self.memory_bus.write_byte(TIMER_CONTROL, 0xF8)
+        self.memory_bus.write_byte(INTERRUPT_FLAG, 0xE1)
+        self.memory_bus.write_byte(LCD_CONTROL, 0x91)
+        self.memory_bus.write_byte(LCD_STAT, 0x81)
+        self.memory_bus.write_byte(0xFF00,0x30)
 
         self._base_inst_handler = {
             'NOP': lambda x : 0,
@@ -73,6 +96,7 @@ class CPU_V2:
 
     def execute_step(self):
         self.clock_cycle = 0
+        self.memory_bus.write_byte(0xFF00,0x3F)
 
         if self.is_halt:
             if self.verify_pending_interrupt() and self.interrupts_enabled:
@@ -85,6 +109,7 @@ class CPU_V2:
             self.clock_cycle += 1
         
         else:
+            ##self.breakpoint()
             instruction = self.get_instruction()
             self.instruction_router(instruction)
 
@@ -537,7 +562,7 @@ class CPU_V2:
             self.program_counter = jump_addr
 
     def rst(self, instruction:Instruction):
-        vector = [0x0 , 0x8 , 0x10 , 0x18 , 0x20 , 0x28 , 0x30 , 0x38]
+        vector = [0x0 , 0x10 , 0x20 , 0x30 , 0x08 , 0x18 , 0x28 , 0x38]
         decoded_inst = instruction.definition.name.split('_')
         operand_def = decoded_inst[1]
 
@@ -876,8 +901,8 @@ class CPU_V2:
         for interrupt_index in requested_interrupts:
             self.is_halt = False
             if interrupt_index in enabled_interrupts:
-                self.clock_cycle += 5
                 self.interrupts_enabled = False
+                self.clock_cycle += 5
                 indirect_instruction = Instruction(INSTRUCTION_DICT.get(0xcd), [INTERRUPT_VECTOR_MAP[interrupt_index], 0])
                 self.clear_interruption_request(interrupt_index)
                 self.call(indirect_instruction)

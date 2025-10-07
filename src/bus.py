@@ -41,9 +41,13 @@ TIMER_COUNTER = 0xFF05
 TIMER_MODULO = 0xFF06
 TIMER_CONTROL = 0xFF07
 
+LCD_CONTROL = 0xFF40
+
+
 class MemoryBus:
     calculator = Calculator()
     memory = [0x00] * (0xFFFF +1)
+    allow_write_vram = True
 
     def load_rom(self, rom):
         if(len(rom) > (ROM_END + 1)):
@@ -56,6 +60,9 @@ class MemoryBus:
         return self.memory[addr] & 0xFF
     
     def write_byte(self, addr, value):
+        if not self.allow_write_vram and addr >= VRAM_BEGIN and addr <= VRAM_END:
+            return
+
         if(addr == TIMER_DIV) :
             self.memory[addr] = 0x00
             return
@@ -81,3 +88,20 @@ class MemoryBus:
         interrupt_request = self.memory[INTERRUPT_FLAG]
         interrupt_request = self.calculator.set_bit(interrupt_request, 2)
         self.memory[INTERRUPT_FLAG] = interrupt_request
+
+    def request_stat_interrupt(self):
+        interrupt_request = self.memory[INTERRUPT_FLAG]
+        interrupt_request = self.calculator.set_bit(interrupt_request, 1)
+        self.memory[INTERRUPT_FLAG] = interrupt_request
+
+    def request_vblank_interrupt(self):
+        interrupt_request = self.memory[INTERRUPT_FLAG]
+        interrupt_request = self.calculator.set_bit(interrupt_request, 0)
+        self.memory[INTERRUPT_FLAG] = interrupt_request
+
+    def block_vram(self):
+        self.allow_write_vram = True
+
+    def free_vram(self):
+        self.allow_write_vram = True
+

@@ -19,13 +19,12 @@ class Motherboard:
     def run_cycles(self, cycles):
         count = 0
         while count < cycles:
+            pygame.event.get()
             m_cycles = self.cpu.execute_step()
             global_cycles = m_cycles * 4
             self.timer.step(global_cycles)
+            self.ppu.step(global_cycles)
             self.clock_cycle += global_cycles
-
-            if count % 69905 == 0:
-                self.ppu.basic_render()
             count += 1
 
-            ##time.sleep(0.0000002384185791015625)
+            ##time.sleep(0.0000000000002)
