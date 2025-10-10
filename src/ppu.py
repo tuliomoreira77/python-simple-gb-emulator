@@ -1,8 +1,4 @@
-import pygame
 from bus import *
-
-SCREEN_WIDTH = 256
-SCREEN_LENGHT = 256
 
 TILE_MAP_1_START = 0x9800
 TILE_MAP_1_END = 0x9BFF
@@ -12,32 +8,31 @@ TILE_MAP_2_END = 0x9FFF
 TILE_DATA_START = 0x8000
 TILE_DATA_END = 0x97FF
 
+OAM_START = 0xFE00
+
 LCD_Y = 0xFF44
 LCD_YC = 0xFF45
 LCD_STAT = 0xFF41
 LCD_CONTROL = 0xFF40
 
-class Screen:
-    white = (255,255,255)
-    black = (0, 0, 0)
-    grey_1 = (85, 85, 85)
-    grey_2 = (170, 170, 170)
 
-    palette = [white, grey_2, grey_1, black]
+class OAMObject:
+    y_position = 0x00
+    x_position = 0x00
+    tile_index = 0x00
+    tile_line = 0x00
+    extended_size = False
+    attributes = 0x00
+    pixels = [0x00] * 8
 
-    def __init__(self):
-        pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_LENGHT))
-        self.screen.fill(self.black)
-        pygame.display.update()
+    def __init__(self, y, x, t, tl, a, extended_size):
+        self.y_position = y
+        self.x_position = x
+        self.tile_index = t
+        self.attributes = a
+        self.tile_line = tl
+        self.extended_size = extended_size
 
-    def draw_line(self, position_y, pixels):
-        pixel_array = pygame.PixelArray(self.screen)
-        for i in range(SCREEN_WIDTH):
-            pixel_array[i, position_y] = self.palette[pixels[i]]
-        pixel_array.close() 
-        update_rect = pygame.Rect(0,position_y,256,1)
-        pygame.display.update(update_rect)
 
 class PPU:
     cycles = 0
@@ -57,16 +52,25 @@ class PPU:
     total_pixels = 256
     grid_size = 32
     
+    oam_objects:list[OAMObject] = []
     calculator = Calculator()
 
-    def __init__(self, memory_bus:MemoryBus):
-        self.screen = Screen()
+    bg_pixel_buffer = [0x00] * 160
+    obj_pixel_buffer = [0x00] * 160
+    pixel_buffer = [0x00] * 160
+    raw_lcd_control = 0x00
+    decoded_lcd_control = {}
+
+    render_next_frame = True
+
+    def __init__(self, memory_bus:MemoryBus, screen):
+        self.screen = screen
         self.memory_bus = memory_bus
 
     def step(self, cycles):
         self.cycles += cycles
 
-        lcd_control = self.get_lcd_control()
+        self.get_lcd_control()
         new_mode = self.get_scanline_mode()
         changed = self.actual_mode != new_mode
         if changed:
@@ -74,22 +78,31 @@ class PPU:
             self.update_stat()
 
         if self.actual_mode == 'MODE_1' and changed:
+            self.render_next_frame = not self.render_next_frame
             self.memory_bus.request_vblank_interrupt()
 
-        if self.actual_mode == 'MODE_2' and changed:
-            pass
+        if self.actual_mode == 'MODE_2' and changed and self.render_next_frame:
+            self.oam_objects = self.oam_scan((self.tile_map_offset * 8) + self.tile_line_offset)
+            self.oam_fetch()
         
-        if self.actual_mode == 'MODE_3' and changed and lcd_control['LCD_ENABLE'] and lcd_control['BG_W_ENABLE']:
-            self.render_line(self.tile_line_offset, self.tile_map_offset)
+        if self.actual_mode == 'MODE_3' and changed and self.render_next_frame:
+            pixel_bg_line = self.render_bg_line(self.tile_line_offset, self.tile_map_offset)
+            pixel_obj_line = self.render_obj_line()
+
+            for i in range(160):
+                if pixel_obj_line[i] != 0:
+                    self.pixel_buffer[i] = pixel_obj_line[i]
+                else:
+                    self.pixel_buffer[i] = pixel_bg_line[i]
+
+            self.screen.draw_line((self.tile_map_offset * 8) + self.tile_line_offset, self.pixel_buffer)
+
             self.tile_line_offset += 1
             if self.tile_line_offset == 8:
                 self.tile_line_offset = 0
                 self.tile_map_offset += 1
-                if self.tile_map_offset == 32:
+                if self.tile_map_offset == 18: ## y_tiles_size
                     self.tile_map_offset = 0
-        
-        if self.actual_mode == 'MODE_0' and changed:
-            pass
         
         if self.cycles >= 456:
             self.update_stat()
@@ -113,16 +126,26 @@ class PPU:
         if self.cycles >= 256 and self.cycles < 456:
             return 'MODE_0'
 
-    def render_line(self, tile_line_offset, tile_map_offset):
-        pixel_line = []
-        for i in range(32):
+    def render_bg_line(self, tile_line_offset, tile_map_offset):
+        for i in range(20): ## x tile size
             tile_map_addr = (TILE_MAP_1_START + i) + (tile_map_offset * 32)
             tile_index = self.memory_bus.read_byte(tile_map_addr)
             tile_addr = self.tile_add_resolver(tile_index, False)
             pixels = self.read_tile_line(tile_addr, tile_line_offset)
-            pixel_line.extend(pixels)
 
-        self.screen.draw_line((tile_map_offset * 8) + tile_line_offset, pixel_line)
+            for p  in range(8):
+                self.bg_pixel_buffer[p + i * 8] = pixels[p]
+
+        return self.bg_pixel_buffer
+    
+    def render_obj_line(self):
+        self.obj_pixel_buffer = [0x00] * 160
+        for obj in self.oam_objects:
+            for i in range(8):
+                if obj.x_position >= 8 and obj.x_position < 168:
+                    self.obj_pixel_buffer[(obj.x_position - 8) + i] = obj.pixels[i]
+            
+        return self.obj_pixel_buffer
 
     def tile_add_resolver(self, tile_index, signed):
         return (tile_index * 16) + TILE_DATA_START
@@ -142,6 +165,42 @@ class PPU:
             mask = mask >> 1
         return pixels
     
+    def oam_scan(self, line_index):
+        lcd_control = self.memory_bus.read_byte(LCD_CONTROL)
+        obj_extended = self.calculator.verify_bit(lcd_control, 2)
+        addr = OAM_START
+        oam_objects = []
+
+        obj_size = 8
+        if obj_extended:
+            obj_size = 16
+
+        for i in range(40):
+            y = self.memory_bus.read_byte(addr)
+
+            if line_index >= (y - 16) and line_index < (y - 16 + obj_size):
+                x = self.memory_bus.read_byte(addr + 1)
+                t = self.memory_bus.read_byte(addr + 2)
+                a = self.memory_bus.read_byte(addr + 3)
+                tl = line_index - (y - 16)
+                oam_objects.append(OAMObject(y,x,t,tl,a, obj_extended))
+            addr += 4
+        return oam_objects
+    
+    def oam_fetch(self):
+        for obj in self.oam_objects:
+            tile_line = obj.tile_line
+            if obj.extended_size:
+                if obj.tile_line >= 8:
+                    tile_addr = self.tile_add_resolver(obj.tile_index | 0x01, False)
+                    tile_line -= 8
+                else:
+                    tile_addr = self.tile_add_resolver(obj.tile_index & 0xFE, False)
+            else:
+                tile_addr = self.tile_add_resolver(obj.tile_index, False)
+
+            tile_line = self.read_tile_line(tile_addr, tile_line)
+            obj.pixels = tile_line
 
     def update_y_coordinate(self):
         self.memory_bus.write_byte(LCD_Y, self.line_rendered)
@@ -175,7 +234,10 @@ class PPU:
 
     def get_lcd_control(self):
         lcd_control_register = self.memory_bus.read_byte(LCD_CONTROL)
-        return {
+
+        if self.raw_lcd_control != lcd_control_register:
+            self.raw_lcd_control = lcd_control_register
+            self.decoded_lcd_control = {
             'LCD_ENABLE': self.calculator.verify_bit(lcd_control_register, 7),
             'W_TILE_MAP': self.calculator.verify_bit(lcd_control_register, 6),
             'WINDOW_ENABLE': self.calculator.verify_bit(lcd_control_register, 5),

@@ -15,17 +15,20 @@ class CPU_V2:
     alu = Calculator()
 
     def breakpoint(self):
-        break_address = [0x29D0, 0x29D5, 0x29DC]
+        break_address = []
         if self.program_counter in break_address:
-            print('BREAK POINT')
-            print('Line : ', hex(self.program_counter))
-            print('Register AF: ', hex(self.registers.get_af()))
-            print('Register BC: ', hex(self.registers.get_bc()))
-            print('Register DE: ', hex(self.registers.get_de()))
-            print('Register HL: ', hex(self.registers.get_hl()))
-            print('Stack Pointer: ', hex(self.stack_pointer))
-            print('LCDC: ' , hex(self.memory_bus.read_byte(LCD_CONTROL)))
+            self.print_debug()
             input('Continue....')
+
+    def print_debug(self):
+        print('BREAK POINT')
+        print('Line: ', hex(self.program_counter))
+        print('Register AF: ', hex(self.registers.get_af()))
+        print('Register BC: ', hex(self.registers.get_bc()))
+        print('Register DE: ', hex(self.registers.get_de()))
+        print('Register HL: ', hex(self.registers.get_hl()))
+        print('Stack Pointer: ', hex(self.stack_pointer))
+        print('LCDC: ' , hex(self.memory_bus.read_byte(LCD_CONTROL)))
 
     def __init__(self, memory_bus:MemoryBus):
         self.memory_bus = memory_bus
@@ -38,7 +41,6 @@ class CPU_V2:
         self.memory_bus.write_byte(INTERRUPT_FLAG, 0xE1)
         self.memory_bus.write_byte(LCD_CONTROL, 0x91)
         self.memory_bus.write_byte(LCD_STAT, 0x81)
-        self.memory_bus.write_byte(0xFF00,0x30)
 
         self._base_inst_handler = {
             'NOP': lambda x : 0,
@@ -96,8 +98,8 @@ class CPU_V2:
 
     def execute_step(self):
         self.clock_cycle = 0
-        self.memory_bus.write_byte(0xFF00,0x3F)
 
+        ##self.breakpoint()
         if self.is_halt:
             if self.verify_pending_interrupt() and self.interrupts_enabled:
                 self.is_halt = False
@@ -109,11 +111,12 @@ class CPU_V2:
             self.clock_cycle += 1
         
         else:
-            ##self.breakpoint()
             instruction = self.get_instruction()
             self.instruction_router(instruction)
 
-            if self.interrupts_enabled:
+            ##print(instruction.definition.name, hex(instruction.operands[1] << 8 & instruction.operands[0]))
+
+            if self.interrupts_enabled and self.verify_pending_interrupt():
                 self.handle_interrupts()
 
         return self.clock_cycle
@@ -128,9 +131,6 @@ class CPU_V2:
             instruction_definition = PREFIX_INSTRUCTION_DICT.get(instruction, None)
         else:
             instruction_definition = INSTRUCTION_DICT.get(instruction, None)
-
-        if instruction_definition == None:
-            print(hex(instruction))
 
         operands = [0x00] * 2
         if instruction_definition.operands_number > 0:
@@ -147,8 +147,6 @@ class CPU_V2:
     def instruction_router(self, instruction:Instruction):
         decoded_base = instruction.definition.name.split('_')[0]
         base_handler = self._base_inst_handler.get(decoded_base)
-        if base_handler == None:
-            print(instruction.definition.name)
         base_handler(instruction)
 
     def add_u8(self, instruction:Instruction):
@@ -769,11 +767,11 @@ class CPU_V2:
             case 'HLI':
                 addr = self.registers.get_hl()
                 value = self.memory_bus.read_byte(addr)
-                self.registers.set_hl(addr + 1) ## this can be buggy
+                self.registers.set_hl((addr + 1) & 0xFFFF)
             case 'HLD':
                 addr = self.registers.get_hl()
                 value = self.memory_bus.read_byte(addr)
-                self.registers.set_hl(addr - 1) ## this can be buggy
+                self.registers.set_hl(addr - 1)
             case _:
                 value = self.memory_bus.read_byte(self.registers.get_16_from_id(from_register))
 
@@ -786,11 +784,11 @@ class CPU_V2:
             case 'HLI':
                 addr = self.registers.get_hl()
                 self.memory_bus.write_byte(addr, value)
-                self.registers.set_hl(addr + 1) ## this can be buggy
+                self.registers.set_hl((addr + 1) & 0xFFFF)
             case 'HLD':
                 addr = self.registers.get_hl()
                 self.memory_bus.write_byte(addr, value)
-                self.registers.set_hl(addr - 1) ## this can be buggy
+                self.registers.set_hl(addr - 1)
             case _:
                 self.memory_bus.write_byte(self.registers.get_16_from_id(to_register), value)
 
@@ -906,6 +904,7 @@ class CPU_V2:
                 indirect_instruction = Instruction(INSTRUCTION_DICT.get(0xcd), [INTERRUPT_VECTOR_MAP[interrupt_index], 0])
                 self.clear_interruption_request(interrupt_index)
                 self.call(indirect_instruction)
+                break
 
     def verify_pending_interrupt(self):
         interrupt_enable = self.memory_bus.read_byte(INTERRUPT_ENABLE_REGISTER)
@@ -913,9 +912,7 @@ class CPU_V2:
         return interrupt_enable & interrupt_flag
 
     def clear_interruption_request(self, interrupt_index):
-        interrupt_flag = self.memory_bus.read_byte(INTERRUPT_FLAG)
-        cleared_state = self.alu.reset_bit(interrupt_flag, interrupt_index)
-        self.memory_bus.write_byte(INTERRUPT_FLAG, cleared_state)
+        self.memory_bus.clear_interruption_request(interrupt_index)
     
     def verify_interrupt_enabled(self):
         interrupt_enable = self.memory_bus.read_byte(INTERRUPT_ENABLE_REGISTER)

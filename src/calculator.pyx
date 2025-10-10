@@ -1,5 +1,15 @@
 class Calculator:
     overflow = False
+    bit_map_lookup = {
+        0: 0b1,
+        1: 0b10,
+        2: 0b100,
+        3: 0b1000,
+        4: 0b10000,
+        5: 0b100000,
+        6: 0b1000000,
+        7: 0b10000000
+    }
 
     def add_u8(self, a, b):
         self.overflow = False
@@ -114,11 +124,11 @@ class Calculator:
         return (lower << 4) | upper
     
     def reset_bit(self, operand, bit):
-        mask = ~(0x01 << bit)
+        mask = ~(self.bit_map_lookup[bit])
         return (operand & mask) & 0xff
     
     def set_bit(self, operand, bit):
-        mask = (0x01 << bit)
+        mask = self.bit_map_lookup[bit]
         return (operand | mask) & 0xff
     
     def verify_overflow(self, a, b, bit):
@@ -130,7 +140,8 @@ class Calculator:
         return b & mask > a & mask
     
     def verify_bit(self, a, bit):
-        return True if ((a >> bit) & 0x1 == 1) else False
+        mask = self.bit_map_lookup[bit]
+        return bool(a & mask)
     
     def not_u8(self, a):
         return ~a & 0xFF
