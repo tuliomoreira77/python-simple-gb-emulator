@@ -1,4 +1,5 @@
 from calculator import *
+import array as arr
 
 VBLANK_VECTOR = 0x40
 TIMER_VECTOR = 0x50
@@ -48,7 +49,7 @@ DMA = 0xFF46
 
 class MemoryBus:
     calculator = Calculator()
-    memory = [0x00] * (0xFFFF +1)
+    memory = arr.array('I', [0x00] * (0xFFFF +1))
     allow_write_vram = True
 
     def __init__(self, joypad):
@@ -65,7 +66,7 @@ class MemoryBus:
         if addr == JOYPAD:
             return self.wire_joypad()
         
-        return self.memory[addr] & 0xFF
+        return self.memory[addr]
     
     def write_byte(self, addr, value):
         if addr <= 0x7fff:

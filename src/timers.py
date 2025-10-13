@@ -35,7 +35,7 @@ class GameboyTimer:
         enabled_inc = (timer_counter_control >> 2) & 0x1
         self._set_timer_config(timer_counter_control)
         if self.timer_counter_cycle > self.timer_step_limit:
-            self.timer_counter_cycle = self.timer_counter_cycle % self.timer_step_limit
+            self.timer_counter_cycle = self.timer_counter_cycle - self.timer_step_limit
             if enabled_inc:
                 self.memory_bus.inc_timer_counter()
 

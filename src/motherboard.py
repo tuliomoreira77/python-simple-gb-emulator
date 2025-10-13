@@ -29,7 +29,7 @@ class Motherboard:
 
             m_cycles = self.cpu.execute_step()
             global_cycles = m_cycles * 4
-            ##self.timer.step(global_cycles)
+            self.timer.step(global_cycles)
             self.ppu.step(global_cycles)
             self.clock_cycle += global_cycles
         except Exception as e:

@@ -1,4 +1,5 @@
 from bus import *
+from numba import njit
 
 TILE_MAP_1_START = 0x9800
 TILE_MAP_1_END = 0x9BFF
@@ -147,7 +148,7 @@ class PPU:
             
         return self.obj_pixel_buffer
 
-    def tile_add_resolver(self, tile_index, signed):
+    def tile_add_resolver(self, tile_index, is_signed):
         return (tile_index * 16) + TILE_DATA_START
 
     def read_tile_line(self, tile_addr, line_index):
@@ -211,18 +212,21 @@ class PPU:
 
         mode_interrupt = 0x00
         mode_ind = 0x00
-        match self.actual_mode:
-            case 'MODE_0':
-                mode_interrupt = 0xb1000
-                mode_ind = 0
-            case 'MODE_1':
-                mode_interrupt = 0xb10000
-                mode_ind = 1
-            case 'MODE_2':
-                mode_interrupt = 0xb100000
-                mode_ind = 2
-            case 'MODE_3':
-                mode_ind = 3
+
+        if self.actual_mode == 'MODE_0':
+            mode_interrupt = 0xb1000
+            mode_ind = 0
+
+        if self.actual_mode == 'MODE_1':
+            mode_interrupt = 0xb10000
+            mode_ind = 1
+
+        if self.actual_mode == 'MODE_2':
+            mode_interrupt = 0xb100000
+            mode_ind = 2
+
+        if self.actual_mode == 'MODE_3':
+            mode_ind = 3
 
         ly_lyc_i = 0xb1000000 if lyc == ly else 0x0
         ly_lyc = 0xb100 if lyc == ly else 0x0
