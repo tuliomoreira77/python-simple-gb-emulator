@@ -1,5 +1,4 @@
 from motherboard import *
-import multiprocessing
 import pygame
 import time
 
@@ -21,6 +20,7 @@ class MockJoypad:
 
 
 class Screen:
+    frame_buffer = bytearray(SCREEN_WIDTH * SCREEN_LENGHT * 3)
     white = (255,255,255)
     black = (0, 0, 0)
     grey_1 = (85, 85, 85)
@@ -35,44 +35,68 @@ class Screen:
         pygame.display.update()
 
     def draw_line(self, position_y, pixels):
-        pixel_array = pygame.PixelArray(self.screen)
-        for i in range(SCREEN_WIDTH):
-            pixel_array[i, position_y] = self.palette[pixels[i]]
-        pixel_array.close() 
-        update_rect = pygame.Rect(0,position_y, SCREEN_WIDTH ,1)
-        pygame.display.update(update_rect)
+        buffer = self.frame_buffer
+        palete = self.palette
 
+        offset_y = position_y * (SCREEN_WIDTH * 3)
+
+        for x in range(SCREEN_WIDTH):
+            r, g, b = palete[pixels[x]]
+            offset_x = x * 3
+            buffer[offset_x + offset_y] = r
+            buffer[offset_x + offset_y + 1] = g
+            buffer[offset_x + offset_y + 2] = b
+
+        if position_y >= SCREEN_LENGHT-1:
+            self.draw_frame()
+
+
+    def draw_frame(self):
+        surf = pygame.image.frombuffer(bytes(self.frame_buffer), (SCREEN_WIDTH, SCREEN_LENGHT), "RGB")
+        self.screen.blit(surf, (0, 0))
+        pygame.display.update()
 
 class Joypad:
-
     key_pressed = False
+
+    def __init__(self):
+        self.d_pad = 0b1111
+        self.buttons = 0b1111
+        
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        
+        self.d_pad = 0b1111
+        self.buttons = 0b1111
+
+        d_pad = self.d_pad
+        buttons = self.buttons
+
+        if keys[pygame.K_DOWN]:
+            self.d_pad = d_pad & 0b0111
+        if keys[pygame.K_UP]:
+            self.d_pad = d_pad & 0b1011
+        if keys[pygame.K_LEFT]:
+            self.d_pad = d_pad & 0b1101
+        if keys[pygame.K_RIGHT]:
+            self.d_pad = d_pad & 0b0110
+
+        if keys[pygame.K_RETURN ]:
+            self.buttons = buttons & 0b0111
+        if keys[pygame.K_SPACE]:
+            self.buttons = buttons & 0b1011
+        if keys[pygame.K_a]:
+            self.buttons = buttons & 0b1101
+        if keys[pygame.K_x]:
+            self.buttons = buttons & 0b1110
+
     
     def get_d_pad(self):
-        d_pad = 0b1111
-        keys=pygame.key.get_pressed()
-        if keys[pygame.K_DOWN]:
-            d_pad = d_pad & 0b0111
-        if keys[pygame.K_UP]:
-            d_pad = d_pad & 0b1011
-        if keys[pygame.K_LEFT]:
-            d_pad = d_pad & 0b1101
-        if keys[pygame.K_RIGHT]:
-            d_pad = d_pad & 0b0110
-
-        return d_pad
+        return self.d_pad
 
     def get_buttons(self):
-        buttons = 0b1111
-        keys=pygame.key.get_pressed()
-        if keys[pygame.K_RETURN ]:
-            buttons = buttons & 0b0111
-        if keys[pygame.K_SPACE]:
-            buttons = buttons & 0b1011
-        if keys[pygame.K_a]:
-            buttons = buttons & 0b1101
-        if keys[pygame.K_x]:
-            buttons = buttons & 0b1110
-        return buttons
+        return self.buttons
 
 
 class Gameboy:
@@ -89,16 +113,20 @@ class Gameboy:
         count = 0
 
         run_cycle = self.motherboard.run_cycle
-        get_event = pygame.event.get
         while running:
             count += 1
-            for event in get_event():
-                if event.type == pygame.QUIT:
-                    running = False
-                
-                if event.type == pygame.KEYDOWN:
-                    self.joypad.key_pressed = True
-        
+            if count % 50 == 0: 
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                    
+                    if event.type == pygame.KEYDOWN:
+                        self.joypad.update()
+                        self.joypad.key_pressed = True
+                    
+                    if event.type == pygame.KEYUP:
+                        self.joypad.update()
+            
             run_cycle()
 
             if count % 100000 == 0:

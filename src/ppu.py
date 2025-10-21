@@ -1,5 +1,4 @@
 from bus import *
-from numba import njit
 
 TILE_MAP_1_START = 0x9800
 TILE_MAP_1_END = 0x9BFF
@@ -128,14 +127,18 @@ class PPU:
             return 'MODE_0'
 
     def render_bg_line(self, tile_line_offset, tile_map_offset):
+        read_byte = self.memory_bus.read_byte
+        tile_add_resolver = self.tile_add_resolver
+        read_tile_line = self.read_tile_line
+
         for i in range(20): ## x tile size
             tile_map_addr = (TILE_MAP_1_START + i) + (tile_map_offset * 32)
-            tile_index = self.memory_bus.read_byte(tile_map_addr)
-            tile_addr = self.tile_add_resolver(tile_index, False)
-            pixels = self.read_tile_line(tile_addr, tile_line_offset)
+            tile_index = read_byte(tile_map_addr)
+            tile_addr = tile_add_resolver(tile_index, False)
+            pixels = read_tile_line(tile_addr, tile_line_offset)
 
-            for p  in range(8):
-                self.bg_pixel_buffer[p + i * 8] = pixels[p]
+            start = i * 8
+            self.bg_pixel_buffer[start: start+8] = pixels
 
         return self.bg_pixel_buffer
     
@@ -167,7 +170,9 @@ class PPU:
         return pixels
     
     def oam_scan(self, line_index):
-        lcd_control = self.memory_bus.read_byte(LCD_CONTROL)
+        read_byte = self.memory_bus.read_byte
+
+        lcd_control = read_byte(LCD_CONTROL)
         obj_extended = self.calculator.verify_bit(lcd_control, 2)
         addr = OAM_START
         oam_objects = []
@@ -177,30 +182,32 @@ class PPU:
             obj_size = 16
 
         for i in range(40):
-            y = self.memory_bus.read_byte(addr)
+            y = read_byte(addr)
 
             if line_index >= (y - 16) and line_index < (y - 16 + obj_size):
-                x = self.memory_bus.read_byte(addr + 1)
-                t = self.memory_bus.read_byte(addr + 2)
-                a = self.memory_bus.read_byte(addr + 3)
+                x = read_byte(addr + 1)
+                t = read_byte(addr + 2)
+                a = read_byte(addr + 3)
                 tl = line_index - (y - 16)
                 oam_objects.append(OAMObject(y,x,t,tl,a, obj_extended))
             addr += 4
         return oam_objects
     
     def oam_fetch(self):
+        tile_add_resolver = self.tile_add_resolver
+        read_tile_line = self.read_tile_line
         for obj in self.oam_objects:
             tile_line = obj.tile_line
             if obj.extended_size:
                 if obj.tile_line >= 8:
-                    tile_addr = self.tile_add_resolver(obj.tile_index | 0x01, False)
+                    tile_addr = tile_add_resolver(obj.tile_index | 0x01, False)
                     tile_line -= 8
                 else:
-                    tile_addr = self.tile_add_resolver(obj.tile_index & 0xFE, False)
+                    tile_addr = tile_add_resolver(obj.tile_index & 0xFE, False)
             else:
-                tile_addr = self.tile_add_resolver(obj.tile_index, False)
+                tile_addr = tile_add_resolver(obj.tile_index, False)
 
-            tile_line = self.read_tile_line(tile_addr, tile_line)
+            tile_line = read_tile_line(tile_addr, tile_line)
             obj.pixels = tile_line
 
     def update_y_coordinate(self):
