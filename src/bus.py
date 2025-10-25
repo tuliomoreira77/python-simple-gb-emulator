@@ -56,11 +56,8 @@ class MemoryBus:
         self.joypad = joypad
 
     def load_rom(self, rom):
-        if(len(rom) > (ROM_END + 1)):
-            raise "ROM SIZE INVALID" # pyright: ignore[reportGeneralTypeIssues]
-
-        for i, rom_byte in enumerate(rom):
-            self.memory[i] = rom_byte
+        for i in range(ROM_END + 1):
+            self.memory[i] = rom[i]
 
     def read_byte(self, addr):
         if addr == JOYPAD:

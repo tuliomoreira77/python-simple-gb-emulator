@@ -5,8 +5,9 @@ TILE_MAP_1_END = 0x9BFF
 TILE_MAP_2_START = 0x9C00
 TILE_MAP_2_END = 0x9FFF
 
-TILE_DATA_START = 0x8000
-TILE_DATA_END = 0x97FF
+TILE_DATA_BLOCK_0 = 0x8000
+TILE_DATA_BLOCK_1 = 0x8800
+TILE_DATA_BLOCK_2 = 0x9000
 
 OAM_START = 0xFE00
 
@@ -14,6 +15,8 @@ LCD_Y = 0xFF44
 LCD_YC = 0xFF45
 LCD_STAT = 0xFF41
 LCD_CONTROL = 0xFF40
+BG_SCROLL_Y = 0xFF42
+BG_SCROLL_X = 0xFF43
 
 
 class OAMObject:
@@ -42,9 +45,6 @@ class PPU:
     mode_2_cycles = 204
     mode_3_cycles = 4560
 
-
-    tile_line_offset = 0
-    tile_map_offset = 0
     line_rendered = 0
 
     actual_mode = 'MODE_2'
@@ -55,11 +55,20 @@ class PPU:
     oam_objects:list[OAMObject] = []
     calculator = Calculator()
 
-    bg_pixel_buffer = [0x00] * 160
+    bg_pixel_buffer = [0x00] * 168
     obj_pixel_buffer = [0x00] * 160
     pixel_buffer = [0x00] * 160
     raw_lcd_control = 0x00
-    decoded_lcd_control = {}
+    decoded_lcd_control = {
+        'LCD_ENABLE': False,
+        'W_TILE_MAP': False,
+        'WINDOW_ENABLE': False,
+        'BG_W_TILES': False,
+        'BG_TILE_MAP': False,
+        'OBJ_SIZE': False,
+        'OBJ_ENABLE': False,
+        'BG_W_ENABLE': False,
+    }
 
     render_next_frame = True
 
@@ -70,10 +79,10 @@ class PPU:
     def step(self, cycles):
         self.cycles += cycles
 
-        self.get_lcd_control()
         new_mode = self.get_scanline_mode()
         changed = self.actual_mode != new_mode
         if changed:
+            self.get_lcd_control()
             self.actual_mode = new_mode
             self.update_stat()
 
@@ -81,13 +90,13 @@ class PPU:
             self.render_next_frame = not self.render_next_frame
             self.memory_bus.request_vblank_interrupt()
 
-        if self.actual_mode == 'MODE_2' and changed and self.render_next_frame:
-            self.oam_objects = self.oam_scan((self.tile_map_offset * 8) + self.tile_line_offset)
+        if self.actual_mode == 'MODE_2' and changed and self.render_next_frame and self.decoded_lcd_control['LCD_ENABLE']:
+            self.oam_objects = self.oam_scan(self.line_rendered)
             self.oam_fetch()
         
-        if self.actual_mode == 'MODE_3' and changed and self.render_next_frame:
-            pixel_bg_line = self.render_bg_line(self.tile_line_offset, self.tile_map_offset)
-            pixel_obj_line = self.render_obj_line()
+        if self.actual_mode == 'MODE_3' and changed and self.render_next_frame and self.decoded_lcd_control['LCD_ENABLE']:
+            pixel_bg_line = self.render_bg_line() if self.decoded_lcd_control['BG_W_ENABLE'] else [0x00] * 160
+            pixel_obj_line = self.render_obj_line() if self.decoded_lcd_control['OBJ_ENABLE'] else [0x00] * 160
 
             for i in range(160):
                 if pixel_obj_line[i] != 0:
@@ -95,16 +104,10 @@ class PPU:
                 else:
                     self.pixel_buffer[i] = pixel_bg_line[i]
 
-            self.screen.draw_line((self.tile_map_offset * 8) + self.tile_line_offset, self.pixel_buffer)
-
-            self.tile_line_offset += 1
-            if self.tile_line_offset == 8:
-                self.tile_line_offset = 0
-                self.tile_map_offset += 1
-                if self.tile_map_offset == 18: ## y_tiles_size
-                    self.tile_map_offset = 0
+            self.screen.draw_line(self.line_rendered, self.pixel_buffer)
         
         if self.cycles >= 456:
+            self.get_lcd_control()
             self.update_stat()
             self.update_y_coordinate()
             self.line_rendered += 1
@@ -126,21 +129,31 @@ class PPU:
         if self.cycles >= 256 and self.cycles < 456:
             return 'MODE_0'
 
-    def render_bg_line(self, tile_line_offset, tile_map_offset):
+    def render_bg_line(self): 
         read_byte = self.memory_bus.read_byte
         tile_add_resolver = self.tile_add_resolver
         read_tile_line = self.read_tile_line
 
-        for i in range(20): ## x tile size
-            tile_map_addr = (TILE_MAP_1_START + i) + (tile_map_offset * 32)
+        y_offset = read_byte(BG_SCROLL_Y)
+        x_offset = read_byte(BG_SCROLL_X)
+        viewport_line = (self.line_rendered + y_offset) % 256
+        tile_line_offset = viewport_line % 8
+        tile_map_offset = int(viewport_line / 8)
+
+        tile_addresing = not self.decoded_lcd_control['BG_W_TILES']
+        tile_map_start = TILE_MAP_2_START if self.decoded_lcd_control['BG_TILE_MAP'] else TILE_MAP_1_START
+        for i in range(21): ## x tile size
+            tile_map_x = (i + int(x_offset/8)) % 32
+            tile_map_addr = (tile_map_start + tile_map_x) + (tile_map_offset * 32)
             tile_index = read_byte(tile_map_addr)
-            tile_addr = tile_add_resolver(tile_index, False)
+            tile_addr = tile_add_resolver(tile_index, tile_addresing)
             pixels = read_tile_line(tile_addr, tile_line_offset)
 
             start = i * 8
             self.bg_pixel_buffer[start: start+8] = pixels
 
-        return self.bg_pixel_buffer
+        x_diff = x_offset % 8
+        return self.bg_pixel_buffer[x_diff : 168-x_diff]
     
     def render_obj_line(self):
         self.obj_pixel_buffer = [0x00] * 160
@@ -152,7 +165,10 @@ class PPU:
         return self.obj_pixel_buffer
 
     def tile_add_resolver(self, tile_index, is_signed):
-        return (tile_index * 16) + TILE_DATA_START
+        if not is_signed:
+            return (tile_index * 16) + TILE_DATA_BLOCK_0
+        else:
+            return (tile_index * 16) + TILE_DATA_BLOCK_2 if tile_index < 128 else (tile_index * 16) + TILE_DATA_BLOCK_1
 
     def read_tile_line(self, tile_addr, line_index):
         line_addr = tile_addr + (line_index * 2)
@@ -172,8 +188,7 @@ class PPU:
     def oam_scan(self, line_index):
         read_byte = self.memory_bus.read_byte
 
-        lcd_control = read_byte(LCD_CONTROL)
-        obj_extended = self.calculator.verify_bit(lcd_control, 2)
+        obj_extended = self.decoded_lcd_control['OBJ_SIZE']
         addr = OAM_START
         oam_objects = []
 
@@ -252,7 +267,7 @@ class PPU:
             'LCD_ENABLE': self.calculator.verify_bit(lcd_control_register, 7),
             'W_TILE_MAP': self.calculator.verify_bit(lcd_control_register, 6),
             'WINDOW_ENABLE': self.calculator.verify_bit(lcd_control_register, 5),
-            'BG_W_TILE_MAP': self.calculator.verify_bit(lcd_control_register, 4),
+            'BG_W_TILES': self.calculator.verify_bit(lcd_control_register, 4),
             'BG_TILE_MAP': self.calculator.verify_bit(lcd_control_register, 3),
             'OBJ_SIZE': self.calculator.verify_bit(lcd_control_register, 2),
             'OBJ_ENABLE': self.calculator.verify_bit(lcd_control_register, 1),

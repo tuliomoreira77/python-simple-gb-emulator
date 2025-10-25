@@ -9,7 +9,13 @@ Docs, stack overflow and google.
 No GPT's, no Copilot,  just some old handmade code.  
 
 
-Docs i'm using mostly:
+Docs i'm using mostly:  
 https://rgbds.gbdev.io/docs/v0.9.4/gbz80.7  
 https://gbdev.io/pandocs/CPU_Instruction_Set.html  
 https://github.com/rylev/boy/blob/master/src/cpu 
+
+
+To run this emulator with a reasoble performance it need to run using PyPy.  
+https://pypy.org/   
+
+Install the pygame-ce using pypy pip install pygame-ce and run it using pypy gameboy.py

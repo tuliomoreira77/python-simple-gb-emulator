@@ -4,6 +4,8 @@ import time
 
 SCREEN_WIDTH = 160
 SCREEN_LENGHT = 144
+SCALE = 2
+SCALED_SIZE = (SCREEN_WIDTH * SCALE, SCREEN_LENGHT * SCALE)
 
 class MockScreen:
     def draw_line(self, position_y, pixels):
@@ -30,7 +32,7 @@ class Screen:
 
     def __init__(self):
         pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_LENGHT))
+        self.screen = pygame.display.set_mode(SCALED_SIZE)
         self.screen.fill(self.black)
         pygame.display.update()
 
@@ -53,7 +55,8 @@ class Screen:
 
     def draw_frame(self):
         surf = pygame.image.frombuffer(bytes(self.frame_buffer), (SCREEN_WIDTH, SCREEN_LENGHT), "RGB")
-        self.screen.blit(surf, (0, 0))
+        scaled_surf = pygame.transform.scale(surf, SCALED_SIZE)
+        self.screen.blit(scaled_surf, (0, 0))
         pygame.display.update()
 
 class Joypad:
