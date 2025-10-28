@@ -209,7 +209,7 @@ class PPU:
             start = i * 8
             self.wd_pixel_buffer[start: start+8] = pixels
 
-        return self.wd_pixel_buffer[window_x:160]
+        return self.wd_pixel_buffer[0:160-window_x]
 
     def render_obj_line(self):
         self.obj_pixel_buffer = [0x00] * 168
