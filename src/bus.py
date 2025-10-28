@@ -1,4 +1,5 @@
 from calculator import *
+from cartridge import *
 import array as arr
 
 VBLANK_VECTOR = 0x40
@@ -20,6 +21,7 @@ ROM_BEGIN = 0x100
 ROM_END = 0x7fff
 ROM_BANK_0_END = 0x3fff
 ROM_BANK_N_BEGIN = 0x4000
+ROM_BANK_N_END = 0x7FFF
 
 EXTERNAL_RAM_BEGIN = 0xa000
 EXTERNAL_RAM_END = 0xbfff
@@ -51,32 +53,58 @@ class MemoryBus:
     calculator = Calculator()
     memory = arr.array('I', [0x00] * (0xFFFF +1))
     allow_write_vram = True
+    cartridge:Cartridge = None
 
     def __init__(self, joypad):
         self.joypad = joypad
 
-    def load_rom(self, rom):
-        for i in range(ROM_END + 1):
-            self.memory[i] = rom[i]
+    def insert_cartridge(self, cartridge:Cartridge):
+        self.cartridge = cartridge
+        for i in range(ROM_BANK_0_END + 1):
+            self.memory[i] = cartridge.game_rom[i]
 
     def read_byte(self, addr):
+        if addr >= ROM_BANK_N_BEGIN and addr <= ROM_BANK_N_END:
+            return self.cartridge.read_rom(addr)
+        
+        if addr >= EXTERNAL_RAM_BEGIN and addr <= EXTERNAL_RAM_END:
+            return self.cartridge.read_ram(addr)
+
         if addr == JOYPAD:
             return self.wire_joypad()
         
         return self.memory[addr]
     
     def write_byte(self, addr, value):
-        if addr <= 0x7fff:
+        if addr >= 0x8000:
+            if(addr == TIMER_DIV) :
+                self.memory[addr] = 0x00
+                return
+
+            if addr >= EXTERNAL_RAM_BEGIN and addr <= EXTERNAL_RAM_END:
+                self.cartridge.write_ram(addr, value)
+                return
+            
+            if addr == DMA:
+                self.dma(value)
+            
+            self.memory[addr] = value & 0xFF
             return
 
-        if(addr == TIMER_DIV) :
-            self.memory[addr] = 0x00
+        if addr < 0x2000:
+            return
+
+        if addr < 0x4000:
+            self.cartridge.select_rom(value)
             return
         
-        if addr == DMA:
-            self.dma(value)
-        
-        self.memory[addr] = value & 0xFF
+        if addr < 0x6000:
+            self.cartridge.select_ram(value)
+            return 
+
+        if addr < 0x8000:
+            ##RTC
+            return
 
     def inc_timer_div(self):
         value = self.memory[TIMER_DIV]
@@ -134,7 +162,8 @@ class MemoryBus:
     def dma(self, addr):
         base_addr = addr << 8
         base_oam = OAM_BEGIN
+        read_byte = self.read_byte
         for i in range (160):
-            self.memory[base_oam] = self.memory[base_addr]
+            self.memory[base_oam] = read_byte(base_addr)
             base_addr += 1
             base_oam += 1

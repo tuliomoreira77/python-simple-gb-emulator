@@ -23,12 +23,22 @@ class MockJoypad:
 
 class Screen:
     frame_buffer = bytearray(SCREEN_WIDTH * SCREEN_LENGHT * 3)
-    white = (255,255,255)
-    black = (0, 0, 0)
-    grey_1 = (85, 85, 85)
-    grey_2 = (170, 170, 170)
+    white = (232, 252, 204)
+    grey_2 = (172, 212, 144)
+    grey_1 = (84, 140, 112)
+    black = (20, 44, 56)
+    
 
-    palette = [white, grey_2, grey_1, black]
+    palette = {
+        0x00: white,
+        0x01: grey_2,
+        0x02: grey_1,
+        0x03: black,
+        0xF0: white,
+        0xF1: grey_2,
+        0xF2: grey_1,
+        0xF3: black
+    }
 
     def __init__(self):
         pygame.init()
@@ -83,7 +93,7 @@ class Joypad:
         if keys[pygame.K_LEFT]:
             self.d_pad = d_pad & 0b1101
         if keys[pygame.K_RIGHT]:
-            self.d_pad = d_pad & 0b0110
+            self.d_pad = d_pad & 0b1110
 
         if keys[pygame.K_RETURN ]:
             self.buttons = buttons & 0b0111
@@ -111,8 +121,8 @@ class Gameboy:
 
     def play(self, cartridge:Cartridge):
         self.motherboard.insert_cartridge(cartridge)
+        self.cartridge = cartridge
         running = True
-        start_time = time.perf_counter()
         count = 0
 
         run_cycle = self.motherboard.run_cycle
@@ -121,6 +131,7 @@ class Gameboy:
             if count % 50 == 0: 
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
+                        cartridge.save_game()
                         running = False
                     
                     if event.type == pygame.KEYDOWN:
@@ -131,17 +142,11 @@ class Gameboy:
                         self.joypad.update()
             
             run_cycle()
-
-            if count % 100000 == 0:
-                end_time = time.perf_counter()
-                elapsed_time = end_time - start_time
-                print(f"Execution time for 100K: {elapsed_time:.4f} seconds")
-                start_time = time.perf_counter()
             
                 
 
 def load_rom_file():
-    with open('../roms/tetris.gb', 'rb') as f:
+    with open('../roms/pokemon_red.gb', 'rb') as f:
         binary_data = f.read()
         return binary_data
 

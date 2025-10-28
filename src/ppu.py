@@ -17,6 +17,8 @@ LCD_STAT = 0xFF41
 LCD_CONTROL = 0xFF40
 BG_SCROLL_Y = 0xFF42
 BG_SCROLL_X = 0xFF43
+W_SCROLL_Y = 0xFF4A
+W_SCROLL_X = 0xFF4B
 
 
 class OAMObject:
@@ -56,7 +58,8 @@ class PPU:
     calculator = Calculator()
 
     bg_pixel_buffer = [0x00] * 168
-    obj_pixel_buffer = [0x00] * 160
+    wd_pixel_buffer = [0x00] * 160
+    obj_pixel_buffer = [0x00] * 168
     pixel_buffer = [0x00] * 160
     raw_lcd_control = 0x00
     decoded_lcd_control = {
@@ -82,12 +85,13 @@ class PPU:
         new_mode = self.get_scanline_mode()
         changed = self.actual_mode != new_mode
         if changed:
+            self.update_y_coordinate()
             self.get_lcd_control()
             self.actual_mode = new_mode
             self.update_stat()
 
         if self.actual_mode == 'MODE_1' and changed:
-            self.render_next_frame = not self.render_next_frame
+            ##self.render_next_frame = not self.render_next_frame
             self.memory_bus.request_vblank_interrupt()
 
         if self.actual_mode == 'MODE_2' and changed and self.render_next_frame and self.decoded_lcd_control['LCD_ENABLE']:
@@ -99,22 +103,27 @@ class PPU:
             pixel_obj_line = self.render_obj_line() if self.decoded_lcd_control['OBJ_ENABLE'] else [0x00] * 160
 
             for i in range(160):
-                if pixel_obj_line[i] != 0:
-                    self.pixel_buffer[i] = pixel_obj_line[i]
-                else:
+                priority = bool(pixel_obj_line[i] & 0xF0)
+                if priority and pixel_bg_line[i] != 0:
                     self.pixel_buffer[i] = pixel_bg_line[i]
+                else:
+                    if pixel_obj_line[i] != 0:
+                        self.pixel_buffer[i] = pixel_obj_line[i]
+                    else:
+                        self.pixel_buffer[i] = pixel_bg_line[i]
 
             self.screen.draw_line(self.line_rendered, self.pixel_buffer)
         
         if self.cycles >= 456:
-            self.get_lcd_control()
-            self.update_stat()
-            self.update_y_coordinate()
             self.line_rendered += 1
+            self.update_y_coordinate()
+            self.update_stat()
+            self.get_lcd_control()
             if self.line_rendered > 153:
                 self.line_rendered = 0
-
             self.cycles = self.cycles % 456
+
+            
         
     def get_scanline_mode(self):
         if self.line_rendered > 143:
@@ -140,9 +149,21 @@ class PPU:
         tile_line_offset = viewport_line % 8
         tile_map_offset = int(viewport_line / 8)
 
+        window_buffer = []
+        if self.decoded_lcd_control['WINDOW_ENABLE']:
+            window_buffer = self.render_wd_line()
+
+        window_x_len = len(window_buffer)
+        if window_x_len == 160:
+            return window_buffer
+
         tile_addresing = not self.decoded_lcd_control['BG_W_TILES']
         tile_map_start = TILE_MAP_2_START if self.decoded_lcd_control['BG_TILE_MAP'] else TILE_MAP_1_START
+        window_x_offset = 160 - window_x_len
         for i in range(21): ## x tile size
+            if i * 8 > window_x_offset:
+                continue
+
             tile_map_x = (i + int(x_offset/8)) % 32
             tile_map_addr = (tile_map_start + tile_map_x) + (tile_map_offset * 32)
             tile_index = read_byte(tile_map_addr)
@@ -153,22 +174,65 @@ class PPU:
             self.bg_pixel_buffer[start: start+8] = pixels
 
         x_diff = x_offset % 8
-        return self.bg_pixel_buffer[x_diff : 168-x_diff]
+        self.bg_pixel_buffer = self.bg_pixel_buffer[x_diff : 160 + x_diff]
+
+        for i in range(window_x_len):
+            self.bg_pixel_buffer[i+window_x_offset] = window_buffer[i]
+
+        return self.bg_pixel_buffer
     
+    def render_wd_line(self):
+        read_byte = self.memory_bus.read_byte
+        tile_add_resolver = self.tile_add_resolver
+        read_tile_line = self.read_tile_line
+        
+        window_y = read_byte(W_SCROLL_Y)
+        if window_y > self.line_rendered:
+            return []
+        
+        window_x = read_byte(W_SCROLL_X) - 7
+        if window_x < 0:
+            window_x = 0
+        
+
+        viewport_line = self.line_rendered - window_y
+        tile_line_offset = viewport_line % 8
+        tile_map_offset = int(viewport_line / 8)
+
+        tile_addresing = not self.decoded_lcd_control['BG_W_TILES']
+        tile_map_start = TILE_MAP_2_START if self.decoded_lcd_control['W_TILE_MAP'] else TILE_MAP_1_START
+        for i in range(20): ## x tile size
+            tile_map_x = i
+            tile_map_addr = (tile_map_start + tile_map_x) + (tile_map_offset * 32)
+            tile_index = read_byte(tile_map_addr)
+            tile_addr = tile_add_resolver(tile_index, tile_addresing)
+            pixels = read_tile_line(tile_addr, tile_line_offset)
+
+            start = i * 8
+            self.wd_pixel_buffer[start: start+8] = pixels
+
+        return self.wd_pixel_buffer[window_x:160]
+
     def render_obj_line(self):
-        self.obj_pixel_buffer = [0x00] * 160
+        self.obj_pixel_buffer = [0x00] * 168
+
+        self.oam_objects.sort(lambda obj: obj.x_position, True)
         for obj in self.oam_objects:
+            mask = 0xF0 if self.calculator.verify_bit(obj.attributes, 7) else 0x00
+            x_inverted = self.calculator.verify_bit(obj.attributes, 5)
             for i in range(8):
                 if obj.x_position >= 8 and obj.x_position < 168:
-                    self.obj_pixel_buffer[(obj.x_position - 8) + i] = obj.pixels[i]
+                    pixel_index = i if not x_inverted else 7-i
+                    if obj.pixels[pixel_index] != 0:
+                        self.obj_pixel_buffer[(obj.x_position - 8) + i] = obj.pixels[pixel_index] | mask
             
-        return self.obj_pixel_buffer
+        return self.obj_pixel_buffer[:160]
 
     def tile_add_resolver(self, tile_index, is_signed):
         if not is_signed:
             return (tile_index * 16) + TILE_DATA_BLOCK_0
         else:
-            return (tile_index * 16) + TILE_DATA_BLOCK_2 if tile_index < 128 else (tile_index * 16) + TILE_DATA_BLOCK_1
+            return (tile_index * 16) + TILE_DATA_BLOCK_2 if tile_index < 128 else (tile_index * 16) + TILE_DATA_BLOCK_0
 
     def read_tile_line(self, tile_addr, line_index):
         line_addr = tile_addr + (line_index * 2)
@@ -222,6 +286,8 @@ class PPU:
             else:
                 tile_addr = tile_add_resolver(obj.tile_index, False)
 
+            y_inverted = self.calculator.verify_bit(obj.attributes, 6)
+            tile_line = tile_line if not y_inverted else 7 - tile_line
             tile_line = read_tile_line(tile_addr, tile_line)
             obj.pixels = tile_line
 

@@ -19,7 +19,7 @@ class Motherboard:
         self.memory_bus.write_byte(JOYPAD, 0x3F)
 
     def insert_cartridge(self, cartridge:Cartridge):
-        self.memory_bus.load_rom(cartridge.game_rom)
+        self.memory_bus.insert_cartridge(cartridge)
 
     def sync_clock(self):
         if self.clock_cycle >= 10000:
@@ -27,8 +27,8 @@ class Motherboard:
             elapsed_time = end_time - self.start_time
             self.start_time = end_time
             self.clock_cycle = self.clock_cycle - 10000
-            if elapsed_time < 0.008:
-                time.sleep(0.008 - elapsed_time)
+            if elapsed_time < 0.007:
+                time.sleep(0.007 - elapsed_time)
 
     def run_cycle(self):
         try:
