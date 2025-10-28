@@ -174,10 +174,8 @@ class PPU:
             self.bg_pixel_buffer[start: start+8] = pixels
 
         x_diff = x_offset % 8
-        self.bg_pixel_buffer = self.bg_pixel_buffer[x_diff : 160 + x_diff]
-
-        for i in range(window_x_len):
-            self.bg_pixel_buffer[i+window_x_offset] = window_buffer[i]
+        self.bg_pixel_buffer = self.bg_pixel_buffer[x_diff:]
+        self.bg_pixel_buffer[window_x_offset:] = window_buffer
 
         return self.bg_pixel_buffer
     

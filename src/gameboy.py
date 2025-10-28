@@ -42,6 +42,7 @@ class Screen:
 
     def __init__(self):
         pygame.init()
+        pygame.display.set_caption("Simple Gameboy")
         self.screen = pygame.display.set_mode(SCALED_SIZE)
         self.screen.fill(self.black)
         pygame.display.update()
