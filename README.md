@@ -2,7 +2,7 @@
 
 A simple **Game Boy emulator** written in **pure Python**, made just for fun.  
 This project it’s 100% handmade using only **docs**, **Stack Overflow**, and **Google**.  
-No Copilot. No GPT (acctually I used to write this readme lol). Just some old-fashioned coding fun.
+No Copilot. No GPT (actually I used to write this readme lol). Just some old-fashioned coding fun.
 
 ---
 
