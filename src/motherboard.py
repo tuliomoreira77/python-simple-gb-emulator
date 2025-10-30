@@ -21,19 +21,8 @@ class Motherboard:
     def insert_cartridge(self, cartridge:Cartridge):
         self.memory_bus.insert_cartridge(cartridge)
 
-    def sync_clock(self):
-        if self.clock_cycle >= 10000:
-            end_time = time.perf_counter()
-            elapsed_time = end_time - self.start_time
-            self.start_time = end_time
-            self.clock_cycle = self.clock_cycle - 10000
-            if elapsed_time < 0.007:
-                time.sleep(0.007 - elapsed_time)
-
     def run_cycle(self):
         try:
-            self.sync_clock()
-
             if self.joypad.key_pressed:
                 self.memory_bus.request_joypad_interrupt()
                 self.joypad.key_pressed = False
@@ -43,6 +32,8 @@ class Motherboard:
             self.timer.step(global_cycles)
             self.ppu.step(global_cycles)
             self.clock_cycle += m_cycles
+
+            return m_cycles
         except Exception as e:
             self.cpu.print_debug()
             raise e

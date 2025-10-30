@@ -72,6 +72,7 @@ class Screen:
 
 class Joypad:
     key_pressed = False
+    speed_up = False
 
     def __init__(self):
         self.d_pad = 0b1111
@@ -105,6 +106,10 @@ class Joypad:
         if keys[pygame.K_x]:
             self.buttons = buttons & 0b1110
 
+        if keys[pygame.K_LSHIFT]:
+            self.speed_up = not self.speed_up
+
+
     
     def get_d_pad(self):
         return self.d_pad
@@ -120,6 +125,45 @@ class Gameboy:
         self.joypad = Joypad()
         self.motherboard = Motherboard(self.screen, self.joypad)
 
+        self.cycles = 0
+        self.time_debit = 0
+        self.start_time = 0
+        self.sync_cycles = 17556 * 2
+        self.sync_time = (self.sync_cycles / 1e6) - 0.005
+
+    def sync_clock(self):
+        if self.cycles >= self.sync_cycles:
+            self.cycles = self.cycles - self.sync_cycles
+            if not self.joypad.speed_up:
+                end_time = time.perf_counter()
+                elapsed_time = end_time - self.start_time + self.time_debit
+                if elapsed_time < self.sync_time:
+                    self.sleep_kernel(self.sync_time - elapsed_time)
+                    self.time_debit = 0
+                else:
+                    diff = elapsed_time - self.sync_time
+                    self.time_debit = diff if diff < self.sync_time else 0
+
+            self.start_time = time.perf_counter()
+
+    def sleep_kernel(self, sleep_time):
+        if sleep_time < 0.01:
+            return
+        time.sleep(sleep_time)
+
+
+    def sleep_cpu(self, sleep_time):
+        sleep_time_ns = sleep_time * 1e9
+        start = time.perf_counter_ns()
+        end = time.perf_counter_ns()
+        count = 0
+        while end - start < sleep_time_ns:
+            count += 1 * 10 * 10 / 10 * 5
+            count += 1 * 10 * 10 / 10 * 5
+            count += 1 * 10 * 10 / 10 * 5
+            end = time.perf_counter_ns()
+
+
     def play(self, cartridge:Cartridge):
         self.motherboard.insert_cartridge(cartridge)
         self.cartridge = cartridge
@@ -128,8 +172,9 @@ class Gameboy:
 
         run_cycle = self.motherboard.run_cycle
         while running:
+            self.sync_clock()
             count += 1
-            if count % 50 == 0: 
+            if count % 1000 == 0: 
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         cartridge.save_game()
@@ -142,16 +187,16 @@ class Gameboy:
                     if event.type == pygame.KEYUP:
                         self.joypad.update()
             
-            run_cycle()
+            self.cycles += run_cycle()
             
                 
-
+file_name = 'tetris.gb'
 def load_rom_file():
-    with open('../roms/pokemon_red.gb', 'rb') as f:
+    with open('../roms/' + file_name, 'rb') as f:
         binary_data = f.read()
         return binary_data
 
-game = Cartridge(load_rom_file())
+game = Cartridge(load_rom_file(), file_name)
 gameboy = Gameboy()
 gameboy.play(game)
 

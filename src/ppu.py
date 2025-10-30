@@ -20,6 +20,10 @@ BG_SCROLL_X = 0xFF43
 W_SCROLL_Y = 0xFF4A
 W_SCROLL_X = 0xFF4B
 
+BG_W_PALETTE = 0xFF47
+OBP0 = 0xFF48
+OBP1 = 0xFF49
+
 
 class OAMObject:
     y_position = 0x00
@@ -61,6 +65,7 @@ class PPU:
     wd_pixel_buffer = [0x00] * 160
     obj_pixel_buffer = [0x00] * 168
     pixel_buffer = [0x00] * 160
+
     raw_lcd_control = 0x00
     decoded_lcd_control = {
         'LCD_ENABLE': False,
@@ -91,7 +96,7 @@ class PPU:
             self.update_stat()
 
         if self.actual_mode == 'MODE_1' and changed:
-            ##self.render_next_frame = not self.render_next_frame
+            self.render_next_frame = not self.render_next_frame
             self.memory_bus.request_vblank_interrupt()
 
         if self.actual_mode == 'MODE_2' and changed and self.render_next_frame and self.decoded_lcd_control['LCD_ENABLE']:
@@ -107,7 +112,7 @@ class PPU:
                 if priority and pixel_bg_line[i] != 0:
                     self.pixel_buffer[i] = pixel_bg_line[i]
                 else:
-                    if pixel_obj_line[i] != 0:
+                    if pixel_obj_line[i] != 0xFF:
                         self.pixel_buffer[i] = pixel_obj_line[i]
                     else:
                         self.pixel_buffer[i] = pixel_bg_line[i]
@@ -145,6 +150,7 @@ class PPU:
 
         y_offset = read_byte(BG_SCROLL_Y)
         x_offset = read_byte(BG_SCROLL_X)
+        palette_map = self.build_palette_map(BG_W_PALETTE)
         viewport_line = (self.line_rendered + y_offset) % 256
         tile_line_offset = viewport_line % 8
         tile_map_offset = int(viewport_line / 8)
@@ -155,7 +161,7 @@ class PPU:
 
         window_x_len = len(window_buffer)
         if window_x_len == 160:
-            return window_buffer
+            return [palette_map[p] for p in window_buffer]
 
         tile_addresing = not self.decoded_lcd_control['BG_W_TILES']
         tile_map_start = TILE_MAP_2_START if self.decoded_lcd_control['BG_TILE_MAP'] else TILE_MAP_1_START
@@ -177,7 +183,7 @@ class PPU:
         self.bg_pixel_buffer = self.bg_pixel_buffer[x_diff:]
         self.bg_pixel_buffer[window_x_offset:] = window_buffer
 
-        return self.bg_pixel_buffer
+        return [palette_map[p] for p in self.bg_pixel_buffer]
     
     def render_wd_line(self):
         read_byte = self.memory_bus.read_byte
@@ -210,19 +216,40 @@ class PPU:
             self.wd_pixel_buffer[start: start+8] = pixels
 
         return self.wd_pixel_buffer[0:160-window_x]
+    
+    def build_palette_map(self, palette_addr):
+        palette = self.memory_bus.read_byte(palette_addr)
+        p_0 = palette & 0b11
+        p_1 = palette >> 2 & 0b11
+        p_2 = palette >> 4 & 0b11
+        p_3 = palette >> 6 & 0b11
 
+        return {
+            0: p_0,
+            1: p_1,
+            2: p_2,
+            3: p_3
+        }
+
+
+    ## I used FF to encode transparency and 0xF0 to encode priority
+    ## This tricks helps when I merge the BG pixel line and the object pixel line
     def render_obj_line(self):
-        self.obj_pixel_buffer = [0x00] * 168
+        self.obj_pixel_buffer = [0xFF] * 168
+        obp0_palette_map = self.build_palette_map(OBP0)
+        obp1_palette_map = self.build_palette_map(OBP1)
 
         self.oam_objects.sort(lambda obj: obj.x_position, True)
         for obj in self.oam_objects:
             mask = 0xF0 if self.calculator.verify_bit(obj.attributes, 7) else 0x00
             x_inverted = self.calculator.verify_bit(obj.attributes, 5)
+            palette_map = obp1_palette_map if self.calculator.verify_bit(obj.attributes, 4) else obp0_palette_map
+
             for i in range(8):
                 if obj.x_position >= 8 and obj.x_position < 168:
                     pixel_index = i if not x_inverted else 7-i
                     if obj.pixels[pixel_index] != 0:
-                        self.obj_pixel_buffer[(obj.x_position - 8) + i] = obj.pixels[pixel_index] | mask
+                        self.obj_pixel_buffer[(obj.x_position - 8) + i] = palette_map[obj.pixels[pixel_index]] | mask
             
         return self.obj_pixel_buffer[:160]
 
@@ -259,8 +286,10 @@ class PPU:
             obj_size = 16
 
         for i in range(40):
-            y = read_byte(addr)
+            if len(oam_objects) > 10:
+                break
 
+            y = read_byte(addr)
             if line_index >= (y - 16) and line_index < (y - 16 + obj_size):
                 x = read_byte(addr + 1)
                 t = read_byte(addr + 2)

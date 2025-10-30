@@ -32,6 +32,8 @@ class Cartridge:
         self.rom_bank_offset = (bank - 1) * BANK_ROM_BASE
 
     def select_ram(self, bank):
+        if bank > 7:
+            return
         self.ram_bank_offset = bank * BANK_RAM_BASE
 
     def load_save(self):
@@ -48,4 +50,13 @@ class Cartridge:
         with open(SAVE_PATH + '/' + self.rom_name + ".sav", "wb") as f:
             f.write(bytes(self.ext_ram))
 
+
+    def set_cartridge_type(self, game_rom):
+        game_type = game_rom[0x147]
+        if game_type == 0x00: ## ROM ONLY
+            pass
+        if game_type == 0x13: ## MBC3 + RAM + BATTERY
+            pass
+        if game_type == 0x03: ## MBC1 + RAM + BATTERY
+            pass
     
