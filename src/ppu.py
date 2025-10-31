@@ -52,6 +52,7 @@ class PPU:
     mode_3_cycles = 4560
 
     line_rendered = 0
+    stat_line_trigger = False
 
     actual_mode = 'MODE_2'
 
@@ -87,23 +88,26 @@ class PPU:
     def step(self, cycles):
         self.cycles += cycles
 
+        if not self.decoded_lcd_control['LCD_ENABLE']:
+            self.get_lcd_control()
+            return
+
         new_mode = self.get_scanline_mode()
         changed = self.actual_mode != new_mode
         if changed:
-            self.update_y_coordinate()
+            self.update_stat()
             self.get_lcd_control()
             self.actual_mode = new_mode
-            self.update_stat()
 
         if self.actual_mode == 'MODE_1' and changed:
-            self.render_next_frame = not self.render_next_frame
+            ##self.render_next_frame = not self.render_next_frame
             self.memory_bus.request_vblank_interrupt()
 
-        if self.actual_mode == 'MODE_2' and changed and self.render_next_frame and self.decoded_lcd_control['LCD_ENABLE']:
+        if self.actual_mode == 'MODE_2' and changed and self.render_next_frame:
             self.oam_objects = self.oam_scan(self.line_rendered)
             self.oam_fetch()
         
-        if self.actual_mode == 'MODE_3' and changed and self.render_next_frame and self.decoded_lcd_control['LCD_ENABLE']:
+        if self.actual_mode == 'MODE_3' and changed and self.render_next_frame:
             pixel_bg_line = self.render_bg_line() if self.decoded_lcd_control['BG_W_ENABLE'] else [0x00] * 160
             pixel_obj_line = self.render_obj_line() if self.decoded_lcd_control['OBJ_ENABLE'] else [0x00] * 160
 
@@ -120,8 +124,8 @@ class PPU:
             self.screen.draw_line(self.line_rendered, self.pixel_buffer)
         
         if self.cycles >= 456:
+            self.stat_line_trigger = False
             self.line_rendered += 1
-            self.update_y_coordinate()
             self.update_stat()
             self.get_lcd_control()
             if self.line_rendered > 153:
@@ -239,7 +243,7 @@ class PPU:
         obp0_palette_map = self.build_palette_map(OBP0)
         obp1_palette_map = self.build_palette_map(OBP1)
 
-        self.oam_objects.sort(lambda obj: obj.x_position, True)
+        self.oam_objects.sort(key=lambda obj: obj.x_position, reverse=True)
         for obj in self.oam_objects:
             mask = 0xF0 if self.calculator.verify_bit(obj.attributes, 7) else 0x00
             x_inverted = self.calculator.verify_bit(obj.attributes, 5)
@@ -318,38 +322,41 @@ class PPU:
             tile_line = read_tile_line(tile_addr, tile_line)
             obj.pixels = tile_line
 
-    def update_y_coordinate(self):
-        self.memory_bus.write_byte(LCD_Y, self.line_rendered)
-
     def update_stat(self):
         lyc = self.memory_bus.read_byte(LCD_YC)
         ly = self.memory_bus.read_byte(LCD_Y)
+        stat = self.memory_bus.read_byte(LCD_STAT)
 
-        mode_interrupt = 0x00
         mode_ind = 0x00
+        trigger_int = False
 
-        if self.actual_mode == 'MODE_0':
-            mode_interrupt = 0xb1000
+        if lyc == ly and self.calculator.verify_bit(stat, 6) and not self.stat_line_trigger:
+            trigger_int = True
+            self.stat_line_trigger = True
+
+        if self.actual_mode == 'MODE_0' and self.calculator.verify_bit(stat, 3):
+            trigger_int = True
             mode_ind = 0
 
-        if self.actual_mode == 'MODE_1':
-            mode_interrupt = 0xb10000
+        if self.actual_mode == 'MODE_1' and self.calculator.verify_bit(stat, 4):
+            trigger_int = True
             mode_ind = 1
 
-        if self.actual_mode == 'MODE_2':
-            mode_interrupt = 0xb100000
+        if self.actual_mode == 'MODE_2' and self.calculator.verify_bit(stat, 5):
+            trigger_int = True
             mode_ind = 2
 
         if self.actual_mode == 'MODE_3':
             mode_ind = 3
 
-        ly_lyc_i = 0xb1000000 if lyc == ly else 0x0
         ly_lyc = 0xb100 if lyc == ly else 0x0
 
-        stat = ly_lyc_i | mode_interrupt | ly_lyc | mode_ind
+        stat = stat & 0xF8 | ly_lyc | mode_ind
         self.memory_bus.write_byte(LCD_Y, self.line_rendered)
         self.memory_bus.write_byte(LCD_STAT, stat)
-        self.memory_bus.request_stat_interrupt()
+
+        if trigger_int:
+            self.memory_bus.request_stat_interrupt()
 
     def get_lcd_control(self):
         lcd_control_register = self.memory_bus.read_byte(LCD_CONTROL)

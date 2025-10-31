@@ -60,11 +60,9 @@ class MemoryBus:
 
     def insert_cartridge(self, cartridge:Cartridge):
         self.cartridge = cartridge
-        for i in range(ROM_BANK_0_END + 1):
-            self.memory[i] = cartridge.game_rom[i]
 
     def read_byte(self, addr):
-        if addr >= ROM_BANK_N_BEGIN and addr <= ROM_BANK_N_END:
+        if addr >= 0 and addr <= ROM_BANK_N_END:
             return self.cartridge.read_rom(addr)
         
         if addr >= EXTERNAL_RAM_BEGIN and addr <= EXTERNAL_RAM_END:

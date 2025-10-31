@@ -7,7 +7,7 @@ from basic_register import *
 class CPU_V2:
     program_counter = 0x0100
     stack_pointer = 0xfffe
-    interrupts_enabled = True
+    interrupts_enabled = False
     is_halt = False
     clock_cycle = 0
 
@@ -32,7 +32,7 @@ class CPU_V2:
 
     def __init__(self, memory_bus:MemoryBus):
         self.memory_bus = memory_bus
-        self.registers.set_af(0xdfb0)
+        self.registers.set_af(0x01b0)
         self.registers.set_bc(0x0013)
         self.registers.set_de(0x00d8)
         self.registers.set_hl(0x014d)
@@ -98,26 +98,25 @@ class CPU_V2:
 
     def execute_step(self):
         self.clock_cycle = 0
+        pending = self.verify_pending_interrupt()
 
         ##self.breakpoint()
         if self.is_halt:
-            if self.verify_pending_interrupt() and self.interrupts_enabled:
+            if pending and self.interrupts_enabled:
                 self.is_halt = False
-                self.handle_interrupts()
+                self.handle_interrupts(pending)
 
-            if self.verify_pending_interrupt() and not self.interrupts_enabled:
+            if pending and not self.interrupts_enabled:
                 self.is_halt = False
             
             self.clock_cycle += 1
         
         else:
+            if self.interrupts_enabled and pending:
+                self.handle_interrupts(pending)
+
             instruction = self.get_instruction()
             self.instruction_router(instruction)
-
-            ##print(instruction.definition.name, hex(instruction.operands[1] << 8 & instruction.operands[0]))
-
-            if self.interrupts_enabled and self.verify_pending_interrupt():
-                self.handle_interrupts()
 
         return self.clock_cycle
 
@@ -892,19 +891,21 @@ class CPU_V2:
     def build_u16_from_operands(self, instruction:Instruction):
         return instruction.operands[1] << 8 | instruction.operands[0]
     
-    def handle_interrupts(self):
-        enabled_interrupts = self.verify_interrupt_enabled()
-        requested_interrupts = self.verify_interrupt_request()
-
-        for interrupt_index in requested_interrupts:
-            self.is_halt = False
-            if interrupt_index in enabled_interrupts:
-                self.interrupts_enabled = False
-                self.clock_cycle += 5
-                indirect_instruction = Instruction(INSTRUCTION_DICT.get(0xcd), [INTERRUPT_VECTOR_MAP[interrupt_index], 0])
-                self.clear_interruption_request(interrupt_index)
-                self.call(indirect_instruction)
-                break
+    def handle_interrupts(self, pending_interrupts):
+        interrupt_index = self.get_first_interrupt(pending_interrupts)
+        self.is_halt = False
+        self.interrupts_enabled = False
+        self.clock_cycle += 5
+        indirect_instruction = Instruction(INSTRUCTION_DICT.get(0xcd), [INTERRUPT_VECTOR_MAP[interrupt_index], 0])
+        self.clear_interruption_request(interrupt_index)
+        self.call(indirect_instruction)
+    
+    def get_first_interrupt(self, pending_interrupts):
+        for i in range(5):
+            if pending_interrupts & 0x01 != 0:
+                return i
+            
+            pending_interrupts = pending_interrupts >> 1
 
     def verify_pending_interrupt(self):
         interrupt_enable = self.memory_bus.read_byte(INTERRUPT_ENABLE_REGISTER)
@@ -913,25 +914,3 @@ class CPU_V2:
 
     def clear_interruption_request(self, interrupt_index):
         self.memory_bus.clear_interruption_request(interrupt_index)
-    
-    def verify_interrupt_enabled(self):
-        interrupt_enable = self.memory_bus.read_byte(INTERRUPT_ENABLE_REGISTER)
-        enabled_interrupts = []
-
-        for i in range(5):
-            enabled = self.alu.verify_bit(interrupt_enable, i)
-            if enabled:
-                enabled_interrupts.append(i)
-
-        return enabled_interrupts
-
-    def verify_interrupt_request(self):
-        interrupt_flag = self.memory_bus.read_byte(INTERRUPT_FLAG)
-        
-        requested_interrupts = []
-        for i in range(5):
-            interrupt_requested = self.alu.verify_bit(interrupt_flag, i)
-            if interrupt_requested:
-                requested_interrupts.append(i)
-
-        return requested_interrupts

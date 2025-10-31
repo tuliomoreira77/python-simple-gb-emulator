@@ -25,7 +25,7 @@ class GameboyTimer:
     def _step_divider(self, cycles):
         self.divider_cycle += cycles
         if self.divider_cycle > self.divider_step_limit:
-            self.divider_cycle = self.divider_cycle % self.divider_step_limit
+            self.divider_cycle = self.divider_cycle - self.divider_step_limit
             self.memory_bus.inc_timer_div()
 
     def _step_timer(self, cycles):
