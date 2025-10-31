@@ -190,7 +190,7 @@ class Gameboy:
             self.cycles += run_cycle()
             
                 
-file_name = 'pokemon_red.gb'
+file_name = 'pokemon_gold.gbc'
 def load_rom_file():
     with open('../roms/' + file_name, 'rb') as f:
         binary_data = f.read()

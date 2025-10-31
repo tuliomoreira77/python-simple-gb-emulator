@@ -32,7 +32,7 @@ class Cartridge:
         self.mbc.load_save()
 
     def save_game(self):
-        self.mbc.save_game
+        self.mbc.save_game()
 
 
     def get_mbc(self, game_rom, rom_name):
