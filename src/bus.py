@@ -101,7 +101,7 @@ class MemoryBus:
             return 
 
         if addr < 0x8000:
-            ##RTC
+            self.cartridge.select_extra(value)
             return
 
     def inc_timer_div(self):

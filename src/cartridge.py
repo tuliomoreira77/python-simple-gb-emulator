@@ -28,6 +28,9 @@ class Cartridge:
     def select_ram(self, bank):
         self.mbc.select_ram(bank)
 
+    def select_extra(self, value):
+        self.mbc.select_extra(value)
+
     def load_save(self):
         self.mbc.load_save()
 
@@ -40,11 +43,26 @@ class Cartridge:
         if game_type == 0x00: ## ROM ONLY
             return MBC0(game_rom, rom_name)
         
-        if game_type == 0x13: ## MBC3 + RAM + BATTERY
-            return MBC3(game_rom, rom_name, with_ram=True, with_battery=True)
+        if game_type == 0x0F: ## MBC3 + BATTERY + TIMER
+            return MBC3(game_rom, rom_name, with_ram=False, with_battery=True, with_rtc=True)
         
         if game_type == 0x10: ## MBC3 + RAM + BATTERY + TIMER
             return MBC3(game_rom, rom_name, with_ram=True, with_battery=True, with_rtc=True)
+        
+        if game_type == 0x11: ## MBC3
+            return MBC3(game_rom, rom_name, with_ram=False, with_battery=False, with_rtc=False)
+        
+        if game_type == 0x12: ## MBC3 + RAM
+            return MBC3(game_rom, rom_name, with_ram=True, with_battery=False, with_rtc=False)
+        
+        if game_type == 0x13: ## MBC3 + RAM + BATTERY
+            return MBC3(game_rom, rom_name, with_ram=True, with_battery=True)
+        
+        if game_type == 0x01: ## MBC1 + RAM + BATTERY
+            return MBC1(game_rom, rom_name, with_ram=False, with_battery=False)
+        
+        if game_type == 0x02: ## MBC1 + RAM
+            return MBC1(game_rom, rom_name, with_ram=True, with_battery=False)
         
         if game_type == 0x03: ## MBC1 + RAM + BATTERY
             return MBC1(game_rom, rom_name, with_ram=True, with_battery=True)
@@ -69,6 +87,9 @@ class MBC0:
         pass
 
     def select_ram(self, bank):
+        pass
+
+    def select_extra(self, value):
         pass
 
     def load_save(self):
@@ -128,6 +149,9 @@ class MBC3:
         self.rtc_register = 0x00
         self.ram_bank_offset = bank * BANK_RAM_BASE
 
+    def select_extra(self, value):
+        pass
+
     def rtc_decode(self):
         utc_time = time.time()
         if self.rtc_register == 0x08:
@@ -167,18 +191,24 @@ class MBC1:
     rom_bank_offset = 0
     ram_bank_offset = 0
 
+    second_rom_bank = 0
+    banking_mode = 0
+
     def __init__(self, game_rom, rom_name = 'default', with_ram=False, with_battery=False):
         self.game_rom = game_rom
         self.rom_size = len(game_rom)
         self.rom_name = rom_name
         self._with_ram = with_ram
-        self._with_battery = with_battery
+        self._with_battery = with_battery 
 
         self.ext_ram = self.load_save()
 
     def read_rom(self, addr):
-        if addr < 0x4000:
+        if addr < 0x4000 and not self.banking_mode:
             return self.game_rom[addr]
+        
+        if addr < 0x4000 and self.banking_mode:
+            return self.game_rom[addr + self.second_rom_bank * BANK_ROM_BASE]
         
         return self.game_rom[addr + self.rom_bank_offset]
 
@@ -195,14 +225,21 @@ class MBC1:
         self.ext_ram[addr - 0xa000 + self.ram_bank_offset] = value & 0xFF
     
     def select_rom(self, bank):
+        bank = bank & 0x1F
         if bank == 0:
-            self.rom_bank_offset = 0
+            self.rom_bank_offset = self.second_rom_bank | 0
             return
         
-        self.rom_bank_offset = (bank - 1) * BANK_ROM_BASE
+        self.rom_bank_offset = ((self.second_rom_bank | bank) - 1) * BANK_ROM_BASE
 
     def select_ram(self, bank):
-        self.ram_bank_offset = bank * BANK_RAM_BASE
+        if self.banking_mode == 0:
+            self.ram_bank_offset = bank * BANK_RAM_BASE
+        else:
+            self.second_rom_bank_offset = (bank & 0x11) << 5
+
+    def select_extra(self, value):
+        self.banking_mode = value & 0x1
         
     def load_save(self):
         if not self._with_battery:

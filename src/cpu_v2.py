@@ -897,7 +897,7 @@ class CPU_V2:
         self.interrupts_enabled = False
         self.clock_cycle += 5
         indirect_instruction = Instruction(INSTRUCTION_DICT.get(0xcd), [INTERRUPT_VECTOR_MAP[interrupt_index], 0])
-        self.clear_interruption_request(interrupt_index)
+        self.memory_bus.clear_interruption_request(interrupt_index)
         self.call(indirect_instruction)
     
     def get_first_interrupt(self, pending_interrupts):
@@ -911,6 +911,4 @@ class CPU_V2:
         interrupt_enable = self.memory_bus.read_byte(INTERRUPT_ENABLE_REGISTER)
         interrupt_flag = self.memory_bus.read_byte(INTERRUPT_FLAG)
         return interrupt_enable & interrupt_flag
-
-    def clear_interruption_request(self, interrupt_index):
-        self.memory_bus.clear_interruption_request(interrupt_index)
+        
