@@ -1,8 +1,8 @@
 
-from instructions_dict import *
-from calculator import *
-from ppu import *
-from basic_register import *
+from emulator.core.instructions_dict import *
+from emulator.core.calculator import *
+from emulator.core.ppu import *
+from emulator.core.basic_register import *
 
 class CPU_V2:
     program_counter = 0x0100

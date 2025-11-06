@@ -1,4 +1,4 @@
-from bus import *
+from emulator.core.bus import *
 
 class GameboyTimer:
     global_clock = 4194304

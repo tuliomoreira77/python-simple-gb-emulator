@@ -1,4 +1,4 @@
-from bus import *
+from emulator.core.bus import *
 
 TILE_MAP_1_START = 0x9800
 TILE_MAP_1_END = 0x9BFF

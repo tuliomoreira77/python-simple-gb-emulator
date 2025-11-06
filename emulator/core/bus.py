@@ -1,5 +1,5 @@
-from calculator import *
-from cartridge import *
+from emulator.core.calculator import *
+from emulator.core.cartridge import *
 import array as arr
 
 VBLANK_VECTOR = 0x40
@@ -48,6 +48,9 @@ LCD_CONTROL = 0xFF40
 JOYPAD = 0xFF00
 DMA = 0xFF46
 
+SB = 0xFF01
+SC = 0xFF02
+
 
 class MemoryBus:
     calculator = Calculator()
@@ -55,8 +58,10 @@ class MemoryBus:
     allow_write_vram = True
     cartridge:Cartridge = None
 
-    def __init__(self, joypad):
+    def __init__(self, joypad, serial_port):
         self.joypad = joypad
+        self.serial_port = serial_port
+        self.serial_port.register_incoming_handler(self.wire_incoming_serial)
 
     def insert_cartridge(self, cartridge:Cartridge):
         self.cartridge = cartridge
@@ -85,6 +90,9 @@ class MemoryBus:
             
             if addr == DMA:
                 self.dma(value)
+
+            if addr == SC and (value == 0x81 or value == 0x80):
+                self.wire_outcome_serial(value)
             
             self.memory[addr] = value & 0xFF
             return
@@ -139,6 +147,11 @@ class MemoryBus:
         interrupt_request = self.calculator.set_bit(interrupt_request, 4)
         self.memory[INTERRUPT_FLAG] = interrupt_request
 
+    def request_serial_interrupt(self):
+        interrupt_request = self.memory[INTERRUPT_FLAG]
+        interrupt_request = self.calculator.set_bit(interrupt_request, 3)
+        self.memory[INTERRUPT_FLAG] = interrupt_request
+
     def clear_interruption_request(self, interrupt):
         interrupt_request = self.memory[INTERRUPT_FLAG]
         interrupt_request = self.calculator.reset_bit(interrupt_request, interrupt)
@@ -156,6 +169,17 @@ class MemoryBus:
             return j_register | d_pad
         if selector == 16:
             return j_register | buttons
+    
+    def wire_outcome_serial(self, value):
+        self.memory[SC] = value
+        self.serial_port.send_byte(self.memory[SB])
+        
+    def wire_incoming_serial(self, value):
+        serial_control = self.memory[SC]
+        if self.calculator.verify_bit(serial_control, 7):
+            self.memory[SB] = value
+            self.memory[SC] = self.calculator.reset_bit(serial_control, 7)
+            self.request_serial_interrupt()
         
     def dma(self, addr):
         base_addr = addr << 8

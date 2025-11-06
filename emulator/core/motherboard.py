@@ -1,21 +1,21 @@
-from bus import *
-from calculator import *
-from ppu import *
-from cpu_v2 import *
-from timers import *
-from cartridge import *
-import time
+from emulator.core.bus import *
+from emulator.core.calculator import *
+from emulator.core.ppu import *
+from emulator.core.cpu_v2 import *
+from emulator.core.timers import *
+from emulator.core.cartridge import *
 
 class Motherboard:
     clock_cycle = 0
     start_time = 0
 
-    def __init__(self, screen, joypad):
-        self.memory_bus = MemoryBus(joypad)
+    def __init__(self, screen, joypad, network_adapter):
+        self.serial_port = network_adapter
+        self.joypad = joypad
+        self.memory_bus = MemoryBus(joypad, self.serial_port)
         self.ppu = PPU(self.memory_bus, screen)
         self.cpu = CPU_V2(self.memory_bus)
         self.timer = GameboyTimer(self.memory_bus)
-        self.joypad = joypad
         self.memory_bus.write_byte(JOYPAD, 0x3F)
 
     def insert_cartridge(self, cartridge:Cartridge):

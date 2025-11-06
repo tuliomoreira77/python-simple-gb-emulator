@@ -2,7 +2,7 @@
 
 A simple **Game Boy emulator** written in **pure Python**, made just for fun.  
 This project it’s 100% handmade using only **docs**, **Stack Overflow**, and **Google**.  
-No Copilot. No GPT (actually I used to write this readme lol). Just some old-fashioned coding fun.
+No Copilot. No GPT. Just some old-fashioned coding fun.
 
 ---
 
@@ -40,22 +40,25 @@ pypy -m pip install pygame-ce
 
 ### 3. Set Your ROM Path
 
-Edit the file `gameboy.py` and set the path to your Game Boy ROM file.
+Create a folder named `roms` on root of repository and place your roms on it (do not use spaces on game roms).
 
-Example:
+Folder structure should look like this:
 
-```python
-ROM_PATH = "roms/pokemon_red.gb"
+```bash
+|-- python-simple-gb-emulator
+    |-- docs
+    |-- roms
+    |-- emulator
+    |-- basic_serial_server.py
+    |-- play.py
 ```
-
-Make sure the path points to a valid `.gb` ROM file.
 
 ### 4. Run the Emulator
 
 Start the emulator from the command line:
 
 ```bash
-pypy gameboy.py
+pypy play.py YOUR_ROM_NAME_WITH_EXTENSION
 ```
 
 If everything is configured correctly, the emulator window will open and the game will start running.
