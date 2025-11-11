@@ -9,7 +9,7 @@ No Copilot. No GPT. Just some old-fashioned coding fun.
 ## ⚙️ About the Project
 
 This emulator aims to replicate the core functionality of the original **Nintendo Game Boy**, including CPU, memory, and graphics rendering.  
-It was created for educational purposes and as a technical challenge to better understand how the Game Boy works internally.
+It was created for educational purposes and as a technical challenge.
 
 ---
 
@@ -93,8 +93,3 @@ This emulator was built **entirely by hand** — without AI tools, Copilot, or c
 Just classic documentation, debugging, and determination.
 
 ---
-
-## 🏁 License
-
-This project is open for study, modification, and experimentation.
-Feel free to fork it, improve it, and learn from it — but don’t expect perfection 😄.
