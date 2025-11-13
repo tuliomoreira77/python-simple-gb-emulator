@@ -37,13 +37,6 @@ Main documentation and references used:
 
 ---
 
-## 🧠 Fun Fact
-
-This emulator was built **entirely by hand** — without AI tools, Copilot, or code generators.
-Just classic documentation, debugging, and determination.
-
----
-
 ## 🚀 How to Run
 
 To achieve a playable performance, this emulator **must** be executed using **PyPy**, the JIT-compiled Python interpreter.  
