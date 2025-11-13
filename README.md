@@ -6,6 +6,13 @@ No Copilot. No GPT. Just some old-fashioned coding fun.
 
 ---
 
+## ⚠️ Disclaimer
+
+> It was written purely for experimentation and learning purposes.
+> Use it at your own risk.
+
+---
+
 ## ⚙️ About the Project
 
 This emulator aims to replicate the core functionality of the original **Nintendo Game Boy**, including CPU, memory, and graphics rendering.  
@@ -20,6 +27,20 @@ Main documentation and references used:
 - [GBZ80 Assembly Reference (rgbds)](https://rgbds.gbdev.io/docs/v0.9.4/gbz80.7)  
 - [Pan Docs – Game Boy Technical Reference](https://gbdev.io/pandocs/CPU_Instruction_Set.html)  
 - [Boy Emulator (Javascprit reference)](https://github.com/rylev/boy/blob/master/src/cpu)
+
+---
+
+## :hammer_and_wrench: To-do
+- Improve serial comunication
+- Audio
+- GameBoy Color support
+
+---
+
+## 🧠 Fun Fact
+
+This emulator was built **entirely by hand** — without AI tools, Copilot, or code generators.
+Just classic documentation, debugging, and determination.
 
 ---
 
@@ -77,19 +98,5 @@ Below are some screenshots from real gameplay captured in this emulator:
 ### Tetris
 
 ![Tetris](docs/3.png)
-
----
-
-## ⚠️ Disclaimer
-
-> It was written purely for experimentation and learning purposes.
-> Use it at your own risk.
-
----
-
-## 🧠 Fun Fact
-
-This emulator was built **entirely by hand** — without AI tools, Copilot, or code generators.
-Just classic documentation, debugging, and determination.
 
 ---
