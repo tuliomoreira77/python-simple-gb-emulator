@@ -170,7 +170,7 @@ class PPU:
         tile_addresing = not self.decoded_lcd_control['BG_W_TILES']
         tile_map_start = TILE_MAP_2_START if self.decoded_lcd_control['BG_TILE_MAP'] else TILE_MAP_1_START
         window_x_offset = 160 - window_x_len
-        for i in range(21): ## x tile size
+        for i in range(21):
             if i * 8 > window_x_offset:
                 continue
 

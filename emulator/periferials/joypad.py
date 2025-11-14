@@ -13,15 +13,14 @@ class MockJoypad:
 class Joypad:
     key_pressed = False
     speed_up = False
+    link_cable = False
 
     def __init__(self):
         self.d_pad = 0b1111
         self.buttons = 0b1111
         
 
-    def update(self):
-        keys = pygame.key.get_pressed()
-        
+    def update(self, keys):
         self.d_pad = 0b1111
         self.buttons = 0b1111
 
@@ -45,10 +44,6 @@ class Joypad:
             self.buttons = buttons & 0b1101
         if keys[pygame.K_x]:
             self.buttons = buttons & 0b1110
-
-        if keys[pygame.K_LSHIFT]:
-            self.speed_up = not self.speed_up
-
 
     
     def get_d_pad(self):

@@ -1,5 +1,7 @@
 from emulator.core.calculator import *
 from emulator.core.cartridge import *
+from emulator.periferials.serial import *
+from emulator.periferials.joypad import *
 import array as arr
 
 VBLANK_VECTOR = 0x40
@@ -58,7 +60,7 @@ class MemoryBus:
     allow_write_vram = True
     cartridge:Cartridge = None
 
-    def __init__(self, joypad, serial_port):
+    def __init__(self, joypad:Joypad, serial_port:SimpleNetworkAdapter):
         self.joypad = joypad
         self.serial_port = serial_port
         self.serial_port.register_incoming_handler(self.wire_incoming_serial)
@@ -177,7 +179,7 @@ class MemoryBus:
     def wire_incoming_serial(self, value):
         serial_control = self.memory[SC]
         if self.calculator.verify_bit(serial_control, 7):
-            self.memory[SB] = value
+            self.memory[SB] = value & 0xFF
             self.memory[SC] = self.calculator.reset_bit(serial_control, 7)
             self.request_serial_interrupt()
         

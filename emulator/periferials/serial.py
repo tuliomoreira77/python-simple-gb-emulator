@@ -21,32 +21,42 @@ class MockNetAdapter:
 
 
 class SimpleNetworkAdapter:
+    in_use = False
     p2p_connection = None
     income_byte_handler = None
-    
-    def __init__(self):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.keep_alive = True
-
+        
     def start(self):
+        self.in_use = True
+        self.keep_alive = True
+        self.p2p_connection = None
         threading.Thread(target=self._init_client, daemon=True).start()
 
     def stop(self):
+        print("Disconnection from server")
+        try:
+            self.p2p_connection.shutdown(socket.SHUT_RDWR)
+            self.p2p_connection.close()
+        except:
+            pass
+
         self.keep_alive = False
+        self.p2p_connection = None
+        self.in_use = False
 
     def _init_client(self):
         try:
-            self.socket.connect((HOST, PORT))
-            self.p2p_connection = self.socket
+            print("Connecting to serial server...")
+            self.p2p_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.p2p_connection.connect((HOST, PORT))
+            print("Connected!")
 
             while self.keep_alive:
                 byte = self.p2p_connection.recv(1)
                 self.income_byte_handler(int.from_bytes(byte))
-
-            self.p2p_connection.close()
+                
         except:
             print(f"Error while processing client...")
-            self.socket.close()
+            self.stop()
 
     def send_byte(self, value: int):
         try:
@@ -54,7 +64,7 @@ class SimpleNetworkAdapter:
                 self.p2p_connection.send(bytes([value]))
         except:
             print("Error while sending data to server...")
-            self.p2p_connection = None
+            self.stop()
             self.income_byte_handler(0xFF)
 
     def register_incoming_handler(self, handler):

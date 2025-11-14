@@ -11,12 +11,10 @@ def load_rom_file(filename):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simple Gamboy Emulator")
     parser.add_argument("rom", help="Rom name inside folder roms")
-    parser.add_argument("--serial", required=False, help="Selects if serial is enabled and if its server or client")
 
     args = parser.parse_args()
     file_name = args.rom
-    serial = args.serial
 
     game = Cartridge(load_rom_file(file_name), file_name)
-    gameboy = Gameboy(serial=serial)
+    gameboy = Gameboy()
     gameboy.play(game)

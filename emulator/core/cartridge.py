@@ -4,7 +4,6 @@ import time
 
 BANK_ROM_BASE = 0x4000
 BANK_RAM_BASE = 0x2000
-SAVE_PATH = './game_saves'
 
 class Cartridge:
     rom_bank_offset = 0
@@ -99,6 +98,8 @@ class MBC0:
         pass
 
 class MBC3:
+    RAM_SIZE = 0x8000
+
     rom_bank_offset = 0
     ram_bank_offset = 0
     rtc_register = 0x00
@@ -110,8 +111,8 @@ class MBC3:
         self._with_ram = with_ram
         self._with_battery = with_battery
         self._with_rtc = with_rtc
-
-        self.ext_ram = self.load_save()
+        self.save_handler = FileSystemSaveHandler(self.RAM_SIZE, rom_name)
+        self.load_save()
 
     def read_rom(self, addr):
         if addr < 0x4000:
@@ -166,28 +167,21 @@ class MBC3:
             return 0x00
         
     def load_save(self):
-        if not self._with_battery:
-            return
-        
-        try:
-            with open(SAVE_PATH + '/' + self.rom_name + ".sav", 'rb') as f:
-                binary_data = f.read()
-                return arr.array('I', binary_data)
-        except:
-            return arr.array('I', [0x00] * (0x7FFF +1))
+        if self._with_battery:
+            self.ext_ram = self.save_handler.load_save()
+        else:
+            self.ext_ram = arr.array('B', [0x00] * (self.RAM_SIZE))
 
     def save_game(self):
-        if not self._with_battery:
-            return
-        
-        if not os.path.exists(SAVE_PATH):
-            os.makedirs(SAVE_PATH)
-        with open(SAVE_PATH + '/' + self.rom_name + ".sav", "wb") as f:
-            f.write(bytes(self.ext_ram))
-
+        if self._with_battery:
+            self.save_handler.save_game(self.ext_ram)
+        else:
+            self.ext_ram = arr.array('B', [0x00] * (self.RAM_SIZE))
 
 
 class MBC1:
+    RAM_SIZE = 0x8000
+
     rom_bank_offset = 0
     ram_bank_offset = 0
 
@@ -200,6 +194,7 @@ class MBC1:
         self.rom_name = rom_name
         self._with_ram = with_ram
         self._with_battery = with_battery 
+        self.save_handler = FileSystemSaveHandler(self.RAM_SIZE, rom_name)
 
         self.ext_ram = self.load_save()
 
@@ -242,21 +237,40 @@ class MBC1:
         self.banking_mode = value & 0x1
         
     def load_save(self):
-        if not self._with_battery:
-            return
-        
-        try:
-            with open(SAVE_PATH + '/' + self.rom_name + ".sav", 'rb') as f:
-                binary_data = f.read()
-                return arr.array('I', binary_data)
-        except:
-            return arr.array('I', [0x00] * (0x7FFF +1))
+        if self._with_battery:
+            self.ext_ram = self.save_handler.load_save()
+        else:
+            self.ext_ram = arr.array('B', [0x00] * (self.RAM_SIZE))
 
     def save_game(self):
-        if not self._with_battery:
-            return
-        
-        if not os.path.exists(SAVE_PATH):
-            os.makedirs(SAVE_PATH)
-        with open(SAVE_PATH + '/' + self.rom_name + ".sav", "wb") as f:
-            f.write(bytes(self.ext_ram))
+        if self._with_battery:
+            self.save_handler.save_game(self.ext_ram)
+        else:
+            self.ext_ram = arr.array('B', [0x00] * (self.RAM_SIZE))
+
+
+class FileSystemSaveHandler:
+    SAVE_PATH = './game_saves'
+
+    def __init__(self, ram_size, rom_name):
+        self.ram_size = ram_size
+        self.rom_name = rom_name
+
+    def load_save(self):
+        try:
+            with open(self.SAVE_PATH + '/' + self.rom_name + ".sav", 'rb') as f:
+                binary_data = f.read()
+
+                ## ENSURE COMPATIBILITY WITH OLD SAVE GAMES
+                if len(binary_data) == self.ram_size: 
+                    return arr.array('B', binary_data)
+                else:
+                    return arr.array('I', binary_data)
+        except:
+            return arr.array('B', [0x00] * (self.ram_size))
+
+    def save_game(self, ext_ram):
+        if not os.path.exists(self.SAVE_PATH):
+            os.makedirs(self.SAVE_PATH)
+        with open(self.SAVE_PATH + '/' + self.rom_name + ".sav", "wb") as f:
+            f.write(bytes([i & 0xFF for i in ext_ram]))

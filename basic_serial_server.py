@@ -28,7 +28,7 @@ class BasicSerialServer:
         g2_thread = threading.Thread(target=self.handle_gameboy_2, daemon=True)
 
         return g1_thread, g2_thread
-
+        
 
     def handle_gameboy_1(self):
         try:
@@ -67,11 +67,16 @@ class BasicSerialServer:
 
         print("Cleanned...")
 
-    def _graceful_socket_opr(self, opr):
+    def _flush(self, source):
+        source.setblocking(False)
         try:
-            opr()
+            while True:
+                data = source.recv(128)
+                if not data:
+                    break
         except:
             pass
+        source.setblocking(True)
 
 
 
